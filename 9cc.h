@@ -1,3 +1,6 @@
+#ifndef NINECC_H
+#define NINECC_H
+
 #include <stdbool.h>
 
 typedef enum {
@@ -66,9 +69,12 @@ Token *tokenize(char *p);
 
 
 // global
-char *user_input;
-Token *token;
+extern char *user_input;
+extern Token *token;
 
 // util
 void error(char *fmt, ...);
 void error_at(char *loc, char *fmt, ...);
+
+
+#endif

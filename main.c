@@ -2,8 +2,8 @@
 #include "9cc.h"
 
 
-extern Token *token; // 現在のtoken pointer
-extern char *user_input; // ユーザの入力したプログラム
+Token *token; // 現在のtoken pointer
+char *user_input; // ユーザの入力したプログラム
 
 int main(int argc, char **argv) {
     if (argc != 2) {
@@ -23,5 +23,8 @@ int main(int argc, char **argv) {
     
     printf("  pop rax\n");
     printf("  ret\n");
+
+    printf("\n");
+    printf(".section .note.GNU-stack,\"\",@progbits\n"); // スタックは実行であるとリンカに伝える
     return 0;
 }
