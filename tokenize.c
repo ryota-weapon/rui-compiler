@@ -3,10 +3,15 @@
 #include <ctype.h>
 #include <string.h>
 #include "9cc.h"
-
+#include <stdio.h> // for debug
 
 // 期待と合致しているか？ それなら読み進めてtrue
 bool consume(char *op) {
+    if (strncmp("return", op, 6) && token->kind == TK_RETURN) {
+        token = token->next;
+        return true;
+    }
+
     if (token->kind != TK_RESERVED 
         || strlen(op) != token->len
         || memcmp(token->str, op, token->len)) {
@@ -34,6 +39,10 @@ int expect_number() {
 }
 
 bool at_eof() {
+    // バグるので、一応安全策を入れてみる,
+    // これでバグの位置が変わったので, tokenがnullの時にバグってたことがわかる
+    // eofのトークンがトークン列に存在しないんだろう。バグで
+    // if (!token) return false;
     return token->kind == TK_EOF;
 }
 
@@ -48,14 +57,31 @@ Token *new_token(TokenKind kind, Token *cur, char *str) {
 }
 
 Token *tokenize(char *p) {
+    // extern Token *token; 別に要らない
+
     Token head;
     head.next = NULL;
     Token *cur = &head;
 
     
     while (*p) {
+        // printf("debug: '%c' (%d)\n", *p, *p);
+
         if (isspace(*p)) {
             p++;
+            continue;
+        }
+
+        if (strncmp(p, "return", 6) == 0 && !is_alnum(p[6])) {
+            Token *tok = calloc(1, sizeof(Token));
+            tok->kind = TK_RETURN;
+            tok->str = p;
+            cur->next = tok;
+            cur = tok;
+            // tokens[i].kind = TK_RETURN;　誤植？
+            // tokens[i].str = p; 誤植？
+            // i++;
+            p += 6;
             continue;
         }
 
@@ -77,6 +103,25 @@ Token *tokenize(char *p) {
         if (isdigit(*p)) {
             cur = new_token(TK_NUM, cur, p);
             cur->val = strtol(p, &p, 10);
+            continue;
+        }
+
+        if ('a' <= *p && *p <= 'z') {
+            cur = new_token(TK_IDENT, cur, p++);
+            cur->len = 1;
+            continue;
+        }
+
+        // 誤植？
+        // これ書かれてないけど、必要な気がするがどうでしょうか？
+        if (*p == ';') {
+            cur = new_token(TK_RESERVED, cur, p++);
+            cur->len = 1;
+            continue;
+        }
+        if (*p == '=') {
+            cur = new_token(TK_RESERVED, cur, p++);
+            cur->len = 1;
             continue;
         }
 

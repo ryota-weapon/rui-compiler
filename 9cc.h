@@ -5,8 +5,11 @@
 
 typedef enum {
     TK_RESERVED,
+    TK_IDENT,
     TK_NUM,
     TK_EOF,
+    TK_RETURN,
+    // TK_SEP,
 } TokenKind;
 
 // 自己参照に使う構文らしい, (TokenがTokenを参照しているでしょ、このstruct)
@@ -33,6 +36,9 @@ typedef enum {
     // ND_GTE,
     ND_EQ,
     ND_NEQ,
+    ND_ASSIGN,
+    ND_LVAR,
+    ND_RETURN
 } NodeKind;
 
 typedef struct Node Node;
@@ -41,10 +47,28 @@ struct Node {
     Node *lhs; // left-hand side
     Node *rhs; // right-hand side
     int val; // kindがND_NUMの時だけ
+    int offset; // kindがND_LVARのときだけ（RBPからどれだけずれるか？）
 };
 
+typedef struct LVar LVar;
+struct LVar {
+    LVar *next; // 連結リスト
+    char *name;
+    int len;
+    int offset;
+};
+
+extern LVar *locals;
+LVar *find_lvar(Token *tok);
+
+
 // parser
+int is_alnum(char c);
+
+Node *program();
+Node *stmt();
 Node *expr();
+Node *assign();
 Node *equality();
 Node *relational();
 Node *add();
@@ -71,10 +95,11 @@ Token *tokenize(char *p);
 // global
 extern char *user_input;
 extern Token *token;
+extern Node *code[100];
 
 // util
 void error(char *fmt, ...);
 void error_at(char *loc, char *fmt, ...);
-
+bool at_eof();
 
 #endif
