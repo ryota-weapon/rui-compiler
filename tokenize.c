@@ -7,7 +7,7 @@
 
 // 期待と合致しているか？ それなら読み進めてtrue
 bool consume(char *op) {
-    if (strncmp("return", op, 6) && token->kind == TK_RETURN) {
+    if (strncmp("return", op, 6)==0 && token->kind == TK_RETURN) {
         token = token->next;
         return true;
     }

@@ -43,5 +43,19 @@ assert() {
 assert 2 '2;'
 assert 3 'return 3;'
 assert 5 'a=1;b=4;return a+b;'
+assert 15 'a=3;b=4;return a*b+3;'
+
+assert 2 'a=2; a;'
+assert 3 'a=1; a=a+2; a;'
+assert 6 'a=1; b=2; c=3; return a+b+c;'
+assert 11 'a=3; b=4; a+b*2;'
+assert 14 'a=2; b=3; return (a+b)*2+4;'
+assert 3 'a=1; b=a+2; return b;'
+assert 7 'a=3; b=4; a=a+b; return a;'
+assert 4 'a=1; b=2; a=b=4; return a;'
+assert 4 'a=1; b=2; a=b=4; return b;'
+assert 1 'a=3; b=4; return a<b;'
+assert 1 'a=3; b=3; return a==b;'
+assert 0 'a=3; b=4; return a==b;'
 
 echo OK

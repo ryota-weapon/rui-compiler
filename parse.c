@@ -43,7 +43,7 @@ Node *stmt() {
     // consumeは現状Returnに対応していない
     if (consume("return")) { // i think this should be like this??
         node = calloc(1, sizeof(Node));
-        node->kind = TK_RETURN;
+        node->kind = ND_RETURN;
         node->lhs = expr();
     } else {
         node = expr();

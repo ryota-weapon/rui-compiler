@@ -23,9 +23,9 @@ int main(int argc, char **argv) {
 
     // プロローグ
     // 変数a-z用のスタック領域を確保、26*8
-    // printf("  push rbp\n");
-    // printf("  mov rbp, rsp\n");
-    // printf("  sub rsp, 208\n");
+    printf("  push rbp\n");
+    printf("  mov rbp, rsp\n");
+    printf("  sub rsp, 208\n");
     //  → 不要になると思われる
 
 

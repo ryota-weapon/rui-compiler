@@ -39,6 +39,7 @@ void gen(Node *node) {
         printf("  pop rax\n");
         printf("  mov [rax], rdi\n");
         printf("  push rdi\n");
+        return;
     }
 
     gen(node->lhs);
@@ -76,10 +77,12 @@ void gen(Node *node) {
         printf("  cmp rax, rdi\n");
         printf("  setl al\n");
         printf("  movzb rax, al\n");
+        break;
     case ND_LTE:
         printf("  cmp rax, rdi\n");
         printf("  setle al\n");
         printf("  movzb rax, al\n");
+        break;
     // case ND_GT:
     // case ND_GTE: これらはパーサー側で処理するよ
     }
