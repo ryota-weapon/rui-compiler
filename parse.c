@@ -130,12 +130,12 @@ int is_alnum(char c) {
 Token *consume_ident() {
     extern Token *token;
     // // このtokenは、グローバル変数
-    if ('a' <= token->str[0] && token->str[0] <= 'z') {
-        // token = token->next;
-        return token;
-    }
-    
-    return 0; // ヌルポインターのつもり
+
+    // 未登録ならとりあえず作るという仕様にしようかな
+    if (token->kind != TK_IDENT) 
+        return NULL;
+
+    return token;
 }
 
 Node *primary() {

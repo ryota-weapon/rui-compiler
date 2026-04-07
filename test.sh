@@ -53,9 +53,9 @@ assert 14 'a=2; b=3; return (a+b)*2+4;'
 assert 3 'a=1; b=a+2; return b;'
 assert 7 'a=3; b=4; a=a+b; return a;'
 assert 4 'a=1; b=2; a=b=4; return a;'
-assert 4 'a=1; b=2; a=b=4; return b;'
+assert 4 'abc=1; xyz=2; abc=xyz=4; return xyz;'
 assert 1 'a=3; b=4; return a<b;'
-assert 1 'a=3; b=3; return a==b;'
-assert 0 'a=3; b=4; return a==b;'
+assert 1 'hoge=3; fuga=3; return hoge==fuga;'
+assert 0 'hoge=3; fuga=4; return hoge==fuga;'
 
 echo OK
