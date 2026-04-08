@@ -38,7 +38,13 @@ typedef enum {
     ND_NEQ,
     ND_ASSIGN,
     ND_LVAR,
-    ND_RETURN
+    ND_RETURN,
+
+    ND_WHILE,
+    ND_IF,
+    ND_FOR,
+    ND_BLOCK,
+    ND_FUNC_CALL,
 } NodeKind;
 
 typedef struct Node Node;
@@ -48,6 +54,14 @@ struct Node {
     Node *rhs; // right-hand side
     int val; // kindがND_NUMの時だけ
     int offset; // kindがND_LVARのときだけ（RBPからどれだけずれるか？）
+    Node *cond; // for only if, while, for
+    Node *body; // for, while, if-else
+    Node *_else; // if-else
+    Node *inc; // for
+    Node *init; // for
+
+    Node **stmt; // pointer to a stmt pointer array (only for block)
+    int stmt_len;
 };
 
 typedef struct LVar LVar;

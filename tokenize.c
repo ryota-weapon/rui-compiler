@@ -7,7 +7,26 @@
 
 // 期待と合致しているか？ それなら読み進めてtrue
 bool consume(char *op) {
-    if (strncmp("return", op, 6)==0 && token->kind == TK_RETURN) {
+    if (strncmp("return", op, 6)==0 && strncmp("return", token->str, 6)==0 
+    && token->kind == TK_RETURN) {
+        token = token->next;
+        return true;
+    }
+    
+    // if (strncmp("while", op, 5)==0 && strncmp("while", token->str, 5)==0 
+    //      && token->kind == TK_RESERVED) {
+    //     token = token->next;
+    //     return true;
+    // }
+    
+    // if (strncmp("if", op, 2)==0 && strncmp("if", token->str, 2)==0 
+    //      && token->kind == TK_RESERVED) {
+    //     token = token->next;
+    //     return true;
+    // }
+
+    // あれなんかやってる子と同じじゃね、結局最初のコードのままでよかったのか？
+    if (strncmp(op, token->str, strlen(op))==0 && token->kind == TK_RESERVED) {
         token = token->next;
         return true;
     }
@@ -72,6 +91,47 @@ Token *tokenize(char *p) {
             continue;
         }
 
+        if (strncmp(p, "while", 5) == 0 && !is_alnum(p[5])) {
+            Token *tok = calloc(1, sizeof(Token));
+            tok->kind = TK_RESERVED;
+            tok->len = 5;
+            tok->str = p;
+            cur->next = tok;
+            cur = tok;
+            p += 5;
+            continue;
+        }
+        if (strncmp(p, "if", 2) == 0 && !is_alnum(p[2])) {
+            Token *tok = calloc(1, sizeof(Token));
+            tok->kind = TK_RESERVED;
+            tok->len = 2;
+            tok->str = p;
+            cur->next = tok;
+            cur = tok;
+            p += 2;
+            continue;
+        }
+        if (strncmp(p, "else", 2) == 0 && !is_alnum(p[4])) {
+            Token *tok = calloc(1, sizeof(Token));
+            tok->kind = TK_RESERVED;
+            tok->len = 4;
+            tok->str = p;
+            cur->next = tok;
+            cur = tok;
+            p += 4;
+            continue;
+        }
+        if (strncmp(p, "for", 3) == 0 && !is_alnum(p[3])) {
+            Token *tok = calloc(1, sizeof(Token));
+            tok->kind = TK_RESERVED;
+            tok->len = 3;
+            tok->str = p;
+            cur->next = tok;
+            cur = tok;
+            p += 3;
+            continue;
+        }
+
         if (strncmp(p, "return", 6) == 0 && !is_alnum(p[6])) {
             Token *tok = calloc(1, sizeof(Token));
             tok->kind = TK_RETURN;
@@ -121,6 +181,11 @@ Token *tokenize(char *p) {
             continue;
         }
         if (*p == '=') {
+            cur = new_token(TK_RESERVED, cur, p++);
+            cur->len = 1;
+            continue;
+        }
+        if (*p == '{' || *p == '}') {
             cur = new_token(TK_RESERVED, cur, p++);
             cur->len = 1;
             continue;

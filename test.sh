@@ -58,4 +58,33 @@ assert 1 'a=3; b=4; return a<b;'
 assert 1 'hoge=3; fuga=3; return hoge==fuga;'
 assert 0 'hoge=3; fuga=4; return hoge==fuga;'
 
+
+assert 11 'a=0;while (a<=5)a=a+1; a = a+5; return a;'
+assert 128 'a=2;while (a<=100)a=a*2; return a;'
+
+assert 2 'a=2;if (a<=10) return 2; return 10;'
+assert 10 'a=2;if (a>10) return 2; return 10;'
+assert 2 'a=2;if (a==2) return 2; else return 10;'
+assert 10 'a=2;if (a==10) return 2; else return 10;'
+assert 3 'a=2;if (a-2) return 2; else a=a+1; return a;'
+assert 5 'hoge=10; if (0) hoge = 3; else hoge = 5; return hoge;'
+
+assert 45 'hoge=0; for (i=0; i<10; i=i+1) hoge = hoge + i; return hoge;'
+assert 10 'hoge=0; for (i=0; i<10; i=i+1) hoge = hoge + 1; return hoge;'
+assert 12 'hoge=5; for (i=3; i<10; i=i+1) hoge = hoge + 1; return hoge;'
+
+assert 6 'a=2;if (a-2) {return 2;} else {a=a+1; a=a+3;} return a;'
+
+
+assert 2 'a=1; if (a) { return 2; } return 3;'
+assert 3 'a=0; if (a) { return 2; } return 3;'
+assert 2 'a=1; if (a) { return 2; } else { return 3; }'
+assert 3 'a=0; if (a) { return 2; } else { return 3; }'
+assert 2 '{ a=2; } return a;'
+assert 3 'a=1; { a=a+2; } return a;'
+assert 6 'a=1; { b=2; c=3; } return a+b+c;'
+
+# func
+assert 0 'func();'
+
 echo OK

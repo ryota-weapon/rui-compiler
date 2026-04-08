@@ -40,7 +40,54 @@ void gen(Node *node) {
         printf("  mov [rax], rdi\n");
         printf("  push rdi\n");
         return;
+    case ND_IF:
+        gen(node->cond);
+        printf("  pop rax\n");
+        printf("  cmp rax, 0\n");
+        printf("  je .Lend_or_else2\n");
+        gen(node->body);
+        printf(".Lend_or_else2:\n");
+        if (node->_else) {
+            gen(node->_else);    
+        }
+        return;
+    case ND_WHILE:
+        printf(".Lbegin1:\n");
+        gen(node->cond);
+        printf("  pop rax\n");
+        printf("  cmp rax, 0\n");
+        printf("  je .Lend1\n");
+        gen(node->body);
+        printf("  jmp .Lbegin1\n");
+        printf(".Lend1:\n");
+        // printf("  push rax\n"); // 必要？
+        return;
+    case ND_FOR:
+        if (node->init)
+            gen(node->init);
+        printf(".Lbegin3:\n");
+        if (node->cond)
+            gen(node->cond);
+        printf("  pop rax\n");
+        printf("  cmp rax, 0\n");
+        printf("  je .Lend3\n");
+        
+        gen(node->body);
+        if (node->inc)
+            gen(node->inc);
+        printf("  jmp .Lbegin3\n");
+        
+        printf(".Lend3:\n");
+        return;
+    case ND_BLOCK:
+        for (int i=0; i<node->stmt_len; i++) {
+            gen(node->stmt[i]);
+        }
+        return;
+    case ND_FUNC_CALL:
+        return;
     }
+    
 
     gen(node->lhs);
     gen(node->rhs);

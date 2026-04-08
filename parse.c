@@ -45,6 +45,53 @@ Node *stmt() {
         node = calloc(1, sizeof(Node));
         node->kind = ND_RETURN;
         node->lhs = expr();
+    } else if (consume("while")) {
+        node = calloc(1, sizeof(Node));
+        node->kind = ND_WHILE;
+        expect("(");
+        node->cond = expr();
+        expect(")");
+        node->body = stmt();
+        return node; // 下にある;の存在チェックと重複してしまって2個必要になってしまうため
+    } else if (consume("for")) {
+        node = calloc(1, sizeof(Node));
+        node->kind = ND_FOR;
+        expect("(");
+        node->init = expr();
+        expect(";");
+        node->cond = expr();
+        expect(";");
+        node->inc = expr();
+        expect(")");
+        node->body = stmt();
+
+        return node;
+    } else if (consume("if")) {
+        node = calloc(1, sizeof(Node));
+        node->kind = ND_IF;
+        expect("(");
+        node->cond = expr();
+        expect(")");
+        node->body = stmt();
+
+        if (consume("else")) {
+            node->_else = stmt();
+        }
+        return node;
+    } else if (consume("{")) {
+        node = calloc(1, sizeof(Node));
+        node->kind = ND_BLOCK;
+
+        Node **node_buf = calloc(1, sizeof(Node)*10); // 一旦固定で10行までサポート
+        int i = 0;
+        while (!consume("}")) {
+            node_buf[i++] = stmt();
+            if (i==10)
+                error("too bigなブロックは今サポートされていない.");
+        }
+        node->stmt_len = i;
+        node->stmt = node_buf;
+        return node;
     } else {
         node = expr();
     }
@@ -168,6 +215,14 @@ Node *primary() {
         }
     
         token = token->next;
+        // 関数callかもしれない
+        if (consume("(")) {
+            expect(")");
+            //　非効率なコードだけどうわがきする
+            node = (Node *)calloc(1, sizeof(Node));
+            node->kind = ND_FUNC_CALL;
+            node->offset = locals->offset;
+        }
         return node;
     }
 
