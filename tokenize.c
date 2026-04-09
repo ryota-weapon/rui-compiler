@@ -40,11 +40,26 @@ bool consume(char *op) {
     return true;
 }
 
+Node * consume_arg() {
+    Node *arg_node = (Node *)calloc(1, sizeof(Node));
+    // ident or num,
+    LVar *lvar = find_lvar(token);
+    if (lvar) {
+        arg_node->offset = lvar->offset;
+        token = token->next;
+    } else if (token -> kind == TK_NUM) {
+        arg_node = new_node_num(expect_number());
+    } else 
+        return NULL;
+        
+    return arg_node;
+}
+
 void expect(char *op) {
     if (token->kind != TK_RESERVED || 
     strlen(op) != token->len ||
     memcmp(token->str, op, token->len)) {
-        error("'%c'ではありません, ", op);
+        error("'%c'ではありません, (%d)", op, op);
     }
     token = token->next;
 }
@@ -185,7 +200,7 @@ Token *tokenize(char *p) {
             cur->len = 1;
             continue;
         }
-        if (*p == '{' || *p == '}') {
+        if (*p == '{' || *p == '}' || *p == ',') {
             cur = new_token(TK_RESERVED, cur, p++);
             cur->len = 1;
             continue;

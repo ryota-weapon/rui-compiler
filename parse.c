@@ -2,6 +2,8 @@
 #include <string.h>
 #include "9cc.h"
 
+#include <stdio.h> // debug
+
 
 Node *new_node(NodeKind kind, Node *lhs, Node *rhs) {
     Node *node = calloc(1, sizeof(Node));
@@ -217,12 +219,25 @@ Node *primary() {
         token = token->next;
         // 関数callかもしれない
         if (consume("(")) {
-            expect(")");
+            int count = 0;
+            Node **args = calloc(1, sizeof(Node)*10);
+            Node *first_arg = consume_arg();
+            if (first_arg) 
+                args[0] = first_arg;
+
+            while (!consume(")")) {
+                expect(",");
+                args[count++] = consume_arg();
+            }
+            
             //　非効率なコードだけどうわがきする
             node = (Node *)calloc(1, sizeof(Node));
             node->kind = ND_FUNC_CALL;
             node->offset = locals->offset;
+            node->args = args;
+            node->arg_len = count;
         }
+        // TODO: align RSP to 16byte due to the ABI
         return node;
     }
 

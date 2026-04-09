@@ -86,5 +86,8 @@ assert 6 'a=1; { b=2; c=3; } return a+b+c;'
 
 # func
 assert 0 'func();'
+assert 0 'func(2);'
+assert 0 'func(3, 4);'
+assert 0 'a=1; b=2; func(a, b);'
 
 echo OK

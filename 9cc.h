@@ -62,6 +62,9 @@ struct Node {
 
     Node **stmt; // pointer to a stmt pointer array (only for block)
     int stmt_len;
+
+    Node **args;
+    int arg_len;
 };
 
 typedef struct LVar LVar;
@@ -94,6 +97,7 @@ Node *primary();
 Node *new_node(NodeKind kind, Node *lhs, Node *rhs);
 Node *new_node_num(int val);
 bool consume(char *op);
+Node *consume_arg();
 void expect(char *op);
 int expect_number();
 
