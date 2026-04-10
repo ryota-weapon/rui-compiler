@@ -90,4 +90,7 @@ assert 0 'func(2);'
 assert 0 'func(3, 4);'
 assert 0 'a=1; b=2; func(a, b);'
 
+
+assert 3 'a=3; b=&a; return *b;'
+
 echo OK

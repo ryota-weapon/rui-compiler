@@ -40,6 +40,9 @@ typedef enum {
     ND_LVAR,
     ND_RETURN,
 
+    ND_ADDR,
+    ND_DEREF,
+
     ND_WHILE,
     ND_IF,
     ND_FOR,

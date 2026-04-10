@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "9cc.h"
 
+// （後からの解釈にはなるが、）スタックトップに変数のアドレスを積むことをやっている
 void gen_lval(Node *node) {
     if (node->kind != ND_LVAR)
         error("左辺値が変数ではないのでだめ");
@@ -35,10 +36,13 @@ void gen(Node *node) {
         gen_lval(node->lhs);
         gen(node->rhs);
 
+//  上記2行によって、スタックには、左辺の変数などのアドレスと、右辺の評価結果が積まれている
         printf("  pop rdi\n");
         printf("  pop rax\n");
-        printf("  mov [rax], rdi\n");
-        printf("  push rdi\n");
+        printf("  mov [rax], rdi\n"); //　左辺のアドレスを使ってアドレッシングして、右辺の値を格納
+        printf("  push rdi\n"); 
+        // なぜpushするか？？教科書に解説あったっけな？ この式全体の値としては右辺の値になるべきなのかもです。　
+        // C言語の仕様はそのようになってるんだっけ？　-> YES
         return;
     case ND_IF:
         gen(node->cond);
@@ -85,6 +89,18 @@ void gen(Node *node) {
         }
         return;
     case ND_FUNC_CALL:
+        return;
+    case ND_ADDR:
+        // スタックトップにアクセスしたい変数のアドレスを積むことをやる
+        gen_lval(node->lhs);
+        return;
+    case ND_DEREF:
+        gen(node->lhs);
+        // スタックトップに変数のアドレスを積む
+        printf("  pop rax\n");
+        printf("  mov rax, [rax]\n");
+        printf("  push rax\n");
+        // スタックトップに変数のアドレスがさす値を積む
         return;
     }
     
