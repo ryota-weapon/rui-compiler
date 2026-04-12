@@ -11,7 +11,31 @@ void gen_lval(Node *node) {
     printf("  push rax\n");
 }
 
+void gen_func(Function *func) {
+    printf("%.*s:\n", func->len, func->name);
+
+    // // プロローグ
+    // // 変数a-z用のスタック領域を確保、26*8
+    printf("  push rbp\n");
+    printf("  mov rbp, rsp\n");
+    // printf("  sub rsp, 208\n");
+    // //  → 不要になると思われる
+
+    gen(func->body);
+
+    //エピローグ (すでにリターンが呼ばれていれば不要だが、一応追加)
+    printf("  mov rsp, rbp\n");
+    printf("  pop rbp\n");
+    printf("  ret\n");
+}
+
+
 void gen(Node *node) {
+    // TODO: ND_FUNC_DEFもここでさばくようにしようかな
+    if (node->kind == ND_LVAR_DEF) { 
+        return;
+    }
+
     if (node->kind == ND_RETURN) {
         gen(node->lhs);
         // 返り値がスタックに積まれるので、それをリターンしてプログラムを終了;
@@ -87,6 +111,9 @@ void gen(Node *node) {
         for (int i=0; i<node->stmt_len; i++) {
             gen(node->stmt[i]);
         }
+        return;
+    case ND_FUNC_DEF:
+        gen_func(node->func);
         return;
     case ND_FUNC_CALL:
         return;

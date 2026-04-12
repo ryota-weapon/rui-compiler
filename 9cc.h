@@ -5,6 +5,7 @@
 
 typedef enum {
     TK_RESERVED,
+    TK_TYPE,
     TK_IDENT,
     TK_NUM,
     TK_EOF,
@@ -48,8 +49,13 @@ typedef enum {
     ND_FOR,
     ND_BLOCK,
     ND_FUNC_CALL,
+    ND_FUNC_DEF,
+
+    ND_LVAR_DEF,
 } NodeKind;
 
+
+typedef struct Function Function;
 typedef struct Node Node;
 struct Node {
     NodeKind kind;
@@ -68,6 +74,17 @@ struct Node {
 
     Node **args;
     int arg_len;
+
+    Function *func;
+};
+
+typedef struct Function Function;
+struct Function {
+    Function *next;
+    char *name;
+    int len;
+    int arg_len;
+    Node *body;
 };
 
 typedef struct LVar LVar;
@@ -78,9 +95,12 @@ struct LVar {
     int offset;
 };
 
+
 extern LVar *locals;
 LVar *find_lvar(Token *tok);
 
+extern Function *funcs; // 連結リスト
+Function *find_fn(Function *fn);
 
 // parser
 int is_alnum(char c);
@@ -101,6 +121,8 @@ Node *new_node(NodeKind kind, Node *lhs, Node *rhs);
 Node *new_node_num(int val);
 bool consume(char *op);
 Node *consume_arg();
+Token *consume_ident();
+bool consume_type();
 void expect(char *op);
 int expect_number();
 

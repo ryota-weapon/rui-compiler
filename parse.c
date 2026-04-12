@@ -4,6 +4,38 @@
 
 #include <stdio.h> // debug
 
+Node *build_block_node() {
+    Node *node;
+    node = calloc(1, sizeof(Node));
+    node->kind = ND_BLOCK;
+
+    Node **node_buf = calloc(1, sizeof(Node)*10); // 一旦固定で10行までサポート
+    int i = 0;
+    while (!consume("}")) {
+        node_buf[i++] = stmt();
+        if (i==10)
+            error("too bigなブロックは今サポートされていない.");
+    }
+    node->stmt_len = i;
+    node->stmt = node_buf;
+    return node;
+}
+
+LVar *register_new_lvar(Token *ident_tok) {
+    LVar *lvar = calloc(1, sizeof(LVar));
+    lvar->next = locals;
+    lvar->name = ident_tok->str;
+    lvar->len = ident_tok->len;
+    // localsリストが空であり、localsポインタがNULLの時にバグる
+    if (locals) {
+        lvar->offset = locals->offset + 8;
+    } else {
+        lvar->offset = 8;
+    }
+    locals = lvar;
+
+    return lvar;
+}
 
 Node *new_node(NodeKind kind, Node *lhs, Node *rhs) {
     Node *node = calloc(1, sizeof(Node));
@@ -38,6 +70,7 @@ Node *program() {
     code[i] = NULL;
 }
 
+// Step17でのサポート、 1. int x;という宣言, 2. int func(int a){...}という関数定義
 Node *stmt() {
     Node *node;
 
@@ -81,18 +114,61 @@ Node *stmt() {
         }
         return node;
     } else if (consume("{")) {
-        node = calloc(1, sizeof(Node));
-        node->kind = ND_BLOCK;
+        node = build_block_node(); // consume } in this func
+        return node;
+    } else if (consume_type()) { // 関数定義 or 変数宣言
+        Token *type_tok = token;
+        token = token->next;
+        if (!consume_ident())
+            error_at(token->str, "型が来たのに関数名or変数名がありません");
+        Token *ident_tok = token;
+        token = token->next;
 
-        Node **node_buf = calloc(1, sizeof(Node)*10); // 一旦固定で10行までサポート
-        int i = 0;
-        while (!consume("}")) {
-            node_buf[i++] = stmt();
-            if (i==10)
-                error("too bigなブロックは今サポートされていない.");
+        if (consume("(")) {
+            // 関数定義
+            Function *fn = calloc(1, sizeof(Function));
+            fn->name = ident_tok->str;
+            fn->len = ident_tok->len;
+            if (funcs) {
+                funcs->next = fn;
+            }
+            funcs = fn;
+            expect(")");
+
+            // TODO: body parse
+            Node *body;
+            if (consume("{")) {
+                body = build_block_node(); // consume } in this func
+            } else {
+                body = stmt();
+            }
+            fn->body = body;
+            node = calloc(1, sizeof(Node));
+            node->kind = ND_FUNC_DEF;
+            node->func = fn;
+            // node->func = fn;
+            return node;
+            // TODO:arg parse
+        } else if (*token->str == ';' || *token->str == ',') { // consumeしちゃうと崩れちゃうから、対応
+            // 変数の宣言である: 変数をLocalsに登録する
+            LVar *lvar = register_new_lvar(ident_tok); 
+            node = calloc(1, sizeof(Node));
+            node->offset = lvar->offset;
+            node->kind = ND_LVAR_DEF;
+
+            // TODO: , で区切って複数同時宣言のサポート
+            while (consume(",")) {
+                if (!consume_ident())
+                    error_at(token->str, "変数名がありません");
+                Token *ident_tok = token;
+                token = token->next;
+                LVar *lvar = register_new_lvar(ident_tok);
+
+                if (consume(";")) break;
+            }
+        } else {
+            error_at(token->str, "型の後は、関数定義か変数宣言のどちらかの形式で書いてください");
         }
-        node->stmt_len = i;
-        node->stmt = node_buf;
         return node;
     } else {
         node = expr();
@@ -187,6 +263,13 @@ Token *consume_ident() {
     return token;
 }
 
+bool consume_type() {
+    extern Token *token;
+    if (token->kind != TK_TYPE) 
+        return false;
+    return true;
+}
+
 Node *primary() {
     if (consume("(")) {
         Node *expr_node =  expr();
@@ -202,18 +285,7 @@ Node *primary() {
         if (lvar) {
             node->offset = lvar->offset;
         } else {
-            lvar = calloc(1, sizeof(LVar));
-            lvar->next = locals;
-            lvar->name = tok->str;
-            lvar->len = tok->len;
-            // localsリストが空であり、localsポインタがNULLの時にバグる
-            if (locals) {
-                lvar->offset = locals->offset + 8;
-            } else {
-                lvar->offset = 8;
-            }
-            locals = lvar;
-            node->offset = lvar->offset;
+            error_at(token->str, "変数 or 関数が宣言されていません");
         }
     
         token = token->next;

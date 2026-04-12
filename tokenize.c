@@ -106,6 +106,17 @@ Token *tokenize(char *p) {
             continue;
         }
 
+        if (strncmp(p, "int", 3) == 0 && !is_alnum(p[3])) {
+            Token *tok = calloc(1, sizeof(Token));
+            tok->kind = TK_TYPE;
+            tok->len = 3;
+            tok->str = p;
+            cur->next = tok;
+            cur = tok;
+            p += 3;
+            continue;
+        }
+
         if (strncmp(p, "while", 5) == 0 && !is_alnum(p[5])) {
             Token *tok = calloc(1, sizeof(Token));
             tok->kind = TK_RESERVED;
