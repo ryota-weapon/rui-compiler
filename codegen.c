@@ -3,6 +3,12 @@
 
 // （後からの解釈にはなるが、）スタックトップに変数のアドレスを積むことをやっている
 void gen_lval(Node *node) {
+    // derefのサポートをした方が良い気がする
+    if (node->kind == ND_DEREF) {
+        gen(node->lhs); // スタックトップに変数の値をアドレスとして積む
+        return;
+    }
+
     if (node->kind != ND_LVAR)
         error("左辺値が変数ではないのでだめ");
 

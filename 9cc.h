@@ -78,6 +78,14 @@ struct Node {
     Function *func;
 };
 
+typedef enum { INT, PTR } TypeKind;
+
+typedef struct Type Type;
+struct Type {
+    TypeKind type;
+    Type *ptr_to; // typeがPTRのとき、指している型
+};
+
 typedef struct Function Function;
 struct Function {
     Function *next;
@@ -93,6 +101,7 @@ struct LVar {
     char *name;
     int len;
     int offset;
+    Type *type;
 };
 
 
@@ -123,8 +132,12 @@ bool consume(char *op);
 Node *consume_arg();
 Token *consume_ident();
 bool consume_type();
+int consume_pointer();
 void expect(char *op);
 int expect_number();
+
+Type *build_type(TypeKind kind, int pointer_count);
+TypeKind token_to_type_kind(Token *tok);
 
 
 // gen

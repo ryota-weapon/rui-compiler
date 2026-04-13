@@ -21,12 +21,15 @@ Node *build_block_node() {
     return node;
 }
 
-LVar *register_new_lvar(Token *ident_tok) {
+LVar *register_new_lvar(Token *ident_tok, Type *type) {
     LVar *lvar = calloc(1, sizeof(LVar));
     lvar->next = locals;
     lvar->name = ident_tok->str;
     lvar->len = ident_tok->len;
+    lvar->type = type;
     // localsリストが空であり、localsポインタがNULLの時にバグる
+
+
     if (locals) {
         lvar->offset = locals->offset + 8;
     } else {
@@ -127,6 +130,10 @@ Node *stmt() {
     } else if (consume_type()) { // 関数定義 or 変数宣言
         Token *type_tok = token;
         token = token->next;
+
+        int ptr_count = consume_pointer();
+        Type *ty = build_type(token_to_type_kind(type_tok), ptr_count);
+
         if (!consume_ident())
             error_at(token->str, "型が来たのに関数名or変数名がありません");
         Token *ident_tok = token;
@@ -147,14 +154,17 @@ Node *stmt() {
                 Token *arg_type_tok = token;
                 token = token->next;
 
-                if (!consume_ident) {
+                int ptr_count = consume_pointer();
+                Type *ty = build_type(token_to_type_kind(arg_type_tok), ptr_count);
+
+                if (!consume_ident()) {
                     error_at(token->str, "引数に変数名がありません");
                 }
                 Token *arg_tok = token;
                 token = token->next;
 
                 // TODO: 本当はスコープの階層構造みたいな概念が必要だと思うが、いったんLVarに追加
-                LVar *lvar = register_new_lvar(arg_tok); 
+                LVar *lvar = register_new_lvar(arg_tok, ty);
                 
                 if (!consume(",")) break;
             }
@@ -176,7 +186,9 @@ Node *stmt() {
             return node;
         } else if (*token->str == ';' || *token->str == ',') { // consumeしちゃうと崩れちゃうから、対応
             // 変数の宣言である: 変数をLocalsに登録する
-            LVar *lvar = register_new_lvar(ident_tok); 
+            int ptr_count = consume_pointer(); // ポインタの宣言をサポートするために、ポインタの数を消費しておく
+            Type *ty = build_type(token_to_type_kind(type_tok), ptr_count);
+            LVar *lvar = register_new_lvar(ident_tok, ty);
             node = calloc(1, sizeof(Node));
             node->offset = lvar->offset;
             node->kind = ND_LVAR_DEF;
@@ -187,7 +199,9 @@ Node *stmt() {
                     error_at(token->str, "変数名がありません");
                 Token *ident_tok = token;
                 token = token->next;
-                LVar *lvar = register_new_lvar(ident_tok);
+                int ptr_count = consume_pointer();
+                Type *ty = build_type(token_to_type_kind(type_tok), ptr_count);
+                LVar *lvar = register_new_lvar(ident_tok, ty);
             }
 
             expect(";");
@@ -293,6 +307,31 @@ bool consume_type() {
     if (token->kind != TK_TYPE) 
         return false;
     return true;
+}
+
+int consume_pointer() {
+    int count = 0;
+    while (consume("*")) {
+        count++;
+    }
+    return count;
+}
+
+TypeKind token_to_type_kind(Token *tok) {
+    if (strncmp(tok->str, "int", tok->len) == 0) {
+        return INT;
+    }
+    error_at(tok->str, "未対応の型です");
+}
+
+Type *build_type(TypeKind kind, int pointer_count) {
+    Type *ty = calloc(1, sizeof(Type));
+    ty->type = kind;
+    if (pointer_count > 0) {
+        ty->type = PTR;
+        ty->ptr_to = build_type(kind, pointer_count-1);
+    }
+    return ty;
 }
 
 Node *primary() {

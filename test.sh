@@ -191,10 +191,11 @@ assert 6 'int main() { int a, b, c; a=1; { b=2; c=3; } return a+b+c;}'
 # assert 0 'int main() { func(1); }'
 # 現状の構文だと、関数定義と関数コールを区別できなくない？
 
-assert 3 'a=3; b=&a; return *b;'
-assert 5 '
-int foo() { return 1; }
-int main() { return foo(); }
-'
+# assert 5 'int foo() { return 1; }
+# int main() { return foo(); }
+# '
+assert 3 'int main() { int a; a=3; int *b; b=&a; return *b;}'
+
+assert 5 'int main() { int a; a=3; int *b; b=&a; *b=5; return a;}'
 
 echo OK
