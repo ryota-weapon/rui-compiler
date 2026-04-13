@@ -100,7 +100,7 @@ extern LVar *locals;
 LVar *find_lvar(Token *tok);
 
 extern Function *funcs; // 連結リスト
-Function *find_fn(Function *fn);
+Function *find_fn(Token *tok);
 
 // parser
 int is_alnum(char c);

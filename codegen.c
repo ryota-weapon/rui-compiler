@@ -72,12 +72,15 @@ void gen(Node *node) {
         gen(node->cond);
         printf("  pop rax\n");
         printf("  cmp rax, 0\n");
-        printf("  je .Lend_or_else2\n");
+        printf("  je .Lelse2\n");
         gen(node->body);
-        printf(".Lend_or_else2:\n");
+        printf("  jmp .Lend2\n");
+        printf(".Lelse2:\n");
         if (node->_else) {
             gen(node->_else);    
         }
+        
+        printf(".Lend2:\n");
         return;
     case ND_WHILE:
         printf(".Lbegin1:\n");
@@ -113,9 +116,41 @@ void gen(Node *node) {
         }
         return;
     case ND_FUNC_DEF:
+        char *arg_regs[] = {"rax", "rcx", "rdx", "rsi", "rdi", "r8", "r9"};
+        // 引数をスタック領域に移して、ローカル変数としてアクセスできるようにする
+        // TODO: これはパフォーマンスの観点としては、よくなさそう、レジスタそのままのアクセスが早そう
+        for (int i=0; i<node->func->arg_len; i++) {
+            printf("  mov rax, rbp\n");
+            printf("  sub rax, %d\n", i*8);
+            printf("  push [rax], %s\n", arg_regs[i]);
+        }
+
         gen_func(node->func);
         return;
     case ND_FUNC_CALL:
+        Function* fn = node->func;
+        if (node->arg_len > 6) {
+            error("引数の数が多すぎます: %.*s\n", fn->len, fn->name);
+        }
+
+        // char *arg_regs[] = {"RAX", "RCX", "RDX", "RSI", "RDI", "R8", "R9"};
+        // char *arg_regs[] = {"rax", "rcx", "rdx", "rsi", "rdi", "r8", "r9"};
+
+        // 引数の準備 (第6まで)
+        // スタックに退避する
+        for (int i=0; i<fn->arg_len; i++) {
+            printf("  push %s\n", arg_regs[i]);
+        }
+        for (int i=0; i<fn->arg_len; i++) {
+            gen_lval(node->args[i]);
+            printf("  pop %s\n", arg_regs[i]);
+        }
+
+
+        // TODO: ABI, align 16
+        // if (rsp)
+        printf("  call %.*s\n", fn->len, fn->name);
+
         return;
     case ND_ADDR:
         // スタックトップにアクセスしたい変数のアドレスを積むことをやる

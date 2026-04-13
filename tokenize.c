@@ -59,14 +59,14 @@ void expect(char *op) {
     if (token->kind != TK_RESERVED || 
     strlen(op) != token->len ||
     memcmp(token->str, op, token->len)) {
-        error("'%c'ではありません, (%d)", op, op);
+        error_at(token->str, "'%c'ではありません, (%d)", op, op);
     }
     token = token->next;
 }
 
 int expect_number() {
     if (token -> kind != TK_NUM) 
-        error("数ではない");
+        error_at(token->str, "数ではない");
     int val = token->val;
     token = token->next;
     return val;

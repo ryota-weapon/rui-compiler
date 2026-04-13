@@ -61,6 +61,14 @@ LVar *find_lvar(Token *tok) {
     return NULL;
 }
 
+Function *find_fn(Token *tok) {
+    for (Function *var=funcs; var; var = var->next) {
+        if (tok->len == var->len && !memcmp(tok->str, var->name, var->len))
+            return var;
+    }
+    return NULL;
+}
+
 
 Node *program() {
     int i = 0;
@@ -130,13 +138,31 @@ Node *stmt() {
             fn->name = ident_tok->str;
             fn->len = ident_tok->len;
             if (funcs) {
-                funcs->next = fn;
+                fn->next = funcs;
             }
             funcs = fn;
+
+            // args
+            while (consume_type()) {
+                Token *arg_type_tok = token;
+                token = token->next;
+
+                if (!consume_ident) {
+                    error_at(token->str, "引数に変数名がありません");
+                }
+                Token *arg_tok = token;
+                token = token->next;
+
+                // TODO: 本当はスコープの階層構造みたいな概念が必要だと思うが、いったんLVarに追加
+                LVar *lvar = register_new_lvar(arg_tok); 
+                
+                if (!consume(",")) break;
+            }
+
             expect(")");
 
-            // TODO: body parse
             Node *body;
+            // TO-FIX: これってさ、stmt()だけで実行できるのでは？
             if (consume("{")) {
                 body = build_block_node(); // consume } in this func
             } else {
@@ -148,7 +174,6 @@ Node *stmt() {
             node->func = fn;
             // node->func = fn;
             return node;
-            // TODO:arg parse
         } else if (*token->str == ';' || *token->str == ',') { // consumeしちゃうと崩れちゃうから、対応
             // 変数の宣言である: 変数をLocalsに登録する
             LVar *lvar = register_new_lvar(ident_tok); 
@@ -163,9 +188,9 @@ Node *stmt() {
                 Token *ident_tok = token;
                 token = token->next;
                 LVar *lvar = register_new_lvar(ident_tok);
-
-                if (consume(";")) break;
             }
+
+            expect(";");
         } else {
             error_at(token->str, "型の後は、関数定義か変数宣言のどちらかの形式で書いてください");
         }
@@ -282,9 +307,10 @@ Node *primary() {
         node->kind = ND_LVAR;
 
         LVar *lvar = find_lvar(tok);
+        Function *func = find_fn(tok);
         if (lvar) {
             node->offset = lvar->offset;
-        } else {
+        } else if (!func) {
             error_at(token->str, "変数 or 関数が宣言されていません");
         }
     
@@ -305,7 +331,7 @@ Node *primary() {
             //　非効率なコードだけどうわがきする
             node = (Node *)calloc(1, sizeof(Node));
             node->kind = ND_FUNC_CALL;
-            node->offset = locals->offset;
+            node->func = func;
             node->args = args;
             node->arg_len = count;
         }

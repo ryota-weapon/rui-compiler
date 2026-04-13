@@ -25,10 +25,20 @@ int main(int argc, char **argv) {
 
     for (int i=0; code[i]; i++) {
         gen(code[i]);
-        printf("  pop rax\n"); //　exprの評価結果として1つ値が残っているので、消しておく。
+        // printf("  pop rax\n"); //　exprの評価結果として1つ値が残っているので、消しておく。
+        // WARN: exprじゃないノードの時にバグる説
+        // 何もスタックに積まない処理もある、ちゃんと図とかを書いて理解した方がよさそう
+        // add, sub, mul, div, eq, neq, lt, lte
+        int exprs[] = { ND_ADD, ND_SUB, ND_MUL, ND_DIV, ND_EQ, ND_NEQ, ND_LT, ND_LTE };
+        for (int j=0; j < sizeof(exprs)/sizeof(exprs[0]); j++ ) {
+            if (exprs[j] == code[i]->kind) {
+                printf("  pop rax\n");
+                break;
+            }
+        }
     }
 
-    
+
 
     printf("\n");
     printf(".section .note.GNU-stack,\"\",@progbits\n"); // スタックは実行であるとリンカに伝える
