@@ -41,16 +41,19 @@ bool consume(char *op) {
 }
 
 Node * consume_arg() {
-    Node *arg_node = (Node *)calloc(1, sizeof(Node));
     // ident or num,
-    LVar *lvar = find_lvar(token);
-    if (lvar) {
-        arg_node->offset = lvar->offset;
-        token = token->next;
-    } else if (token -> kind == TK_NUM) {
-        arg_node = new_node_num(expect_number());
-    } else 
-        return NULL;
+    // LVar *lvar = find_lvar(token);
+    // if (lvar) {
+    //     arg_node->offset = lvar->offset;
+    //     token = token->next;
+    // } else if (token -> kind == TK_NUM) {
+    //     arg_node = new_node_num(expect_number());
+    // } else 
+    //     return NULL;
+
+    // WARN: ident or numだけじゃなくてポインタとか式の可能性がある
+    // exprとして読めばよい
+    Node *arg_node = expr();
         
     return arg_node;
 }
@@ -59,7 +62,9 @@ void expect(char *op) {
     if (token->kind != TK_RESERVED || 
     strlen(op) != token->len ||
     memcmp(token->str, op, token->len)) {
-        error_at(token->str, "'%c'ではありません, (%d)", op, op);
+        error_at(token->str, "'%s'ではありません", op);
+        // error_at(token->str, "'%c'ではありません, (%d)", op, op);
+        // なんか挙動おかしい?、ex.  X^ 'E'ではありません, (-1551321787)
     }
     token = token->next;
 }
@@ -228,7 +233,7 @@ Token *tokenize(char *p) {
             continue;
         }
 
-        error("トークナイズできません");
+        error_at(p, "トークナイズできません");
     }
 
     new_token(TK_EOF, cur, p);

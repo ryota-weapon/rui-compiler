@@ -78,6 +78,8 @@ struct Node {
     int arg_len;
 
     Function *func;
+    char *func_symbol;
+    int func_symbol_len;
 
     Type *type;
 };

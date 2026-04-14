@@ -298,16 +298,41 @@ Node *equality() {
     }
 }
 
+int size_of(Type *ty) {
+    if (ty->kind == TY_INT) {
+        return 4;
+    } else if (ty->kind == TY_PTR) {
+        return 8;
+    } else {
+        error("intでもptrでもない型のsizeofはサポートしていません");
+    }
+}
+
 Node *add() {
     Node *node = mul();
     
     for (;;) {
-        if (consume("+")) 
-            node = new_node(ND_ADD, node, mul());
-        else if (consume("-")) 
-            node = new_node(ND_SUB, node, mul());
-        else
+        if (token->str[0] == '+' || token->str[0] == '-') {
+            NodeKind kind = token->str[0] == '+' ? ND_ADD : ND_SUB; // どっちの演算子だったかを覚えておく
+            token = token->next;
+
+            Node *lhs = node;
+            Node *rhs = mul();
+            // add or sub, pointer 8, int: 4
+            if (lhs->type->kind == TY_PTR && rhs->type->kind == TY_INT) {
+                rhs = new_node(ND_MUL, rhs, new_node_num(size_of(lhs->type->ptr_to)));
+                node = new_node(kind, lhs, rhs);
+            } else if (lhs->type->kind == TY_INT && rhs->type->kind == TY_PTR) {
+                lhs = new_node(ND_MUL, lhs, new_node_num(size_of(rhs->type->ptr_to)));
+                node = new_node(kind, lhs, rhs);
+            } else if (lhs->type->kind == TY_PTR && rhs->type->kind == TY_PTR && kind == ND_ADD) {
+                error("ポインタ同士の加算はサポートしていません");
+            } else { // ptr同士の減算はサポートしている, この時、倍率を考慮する必要はないはず
+                node = new_node(kind, lhs, rhs);
+            }
+        } else {
             return node;
+        }
     }
 }
 
@@ -401,8 +426,10 @@ Node *primary() {
         Function *func = find_fn(tok);
         if (lvar) {
             node->offset = lvar->offset;
+            node->type = lvar->type;
         } else if (!func) {
-            error_at(token->str, "変数 or 関数が宣言されていません");
+            // TODO: 外部関数の呼び出しを雑にできるように臨時パッチ
+            // error_at(token->str, "変数 or 関数が宣言されていません");
         }
     
         token = token->next;
@@ -410,19 +437,21 @@ Node *primary() {
         if (consume("(")) {
             int count = 0;
             Node **args = calloc(1, sizeof(Node)*10);
-            Node *first_arg = consume_arg();
-            if (first_arg) 
-                args[0] = first_arg;
-
-            while (!consume(")")) {
-                expect(",");
-                args[count++] = consume_arg();
+            
+            if (!consume(")")) {
+                args[count++] = expr();
+                while (consume(",")) {
+                    args[count++] = expr();
+                }
+                expect(")");
             }
             
             //　非効率なコードだけどうわがきする
             node = (Node *)calloc(1, sizeof(Node));
             node->kind = ND_FUNC_CALL;
-            node->func = func;
+            // node->func = func; // WARN: oh my gosh, 外部関数の時に摘む
+            node->func_symbol = tok->str;
+            node->func_symbol_len = tok->len;
             node->args = args;
             node->arg_len = count;
         }
@@ -431,7 +460,7 @@ Node *primary() {
 
         // 型情報の考慮をしてあげたい (ここが適切かは不明)
         // TODO: 関数の戻り値の型の管理
-        node->type = lvar->type;
+        
 
         return node;
     }
