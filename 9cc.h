@@ -52,11 +52,13 @@ typedef enum {
     ND_FUNC_DEF,
 
     ND_LVAR_DEF,
+    ND_SIZEOF,
 } NodeKind;
 
 
 typedef struct Function Function;
 typedef struct Node Node;
+typedef struct Type Type;
 struct Node {
     NodeKind kind;
     Node *lhs; // left-hand side
@@ -76,13 +78,14 @@ struct Node {
     int arg_len;
 
     Function *func;
+
+    Type *type;
 };
 
-typedef enum { INT, PTR } TypeKind;
+typedef enum { TY_INT, TY_PTR } TypeKind;
 
-typedef struct Type Type;
 struct Type {
-    TypeKind type;
+    TypeKind kind;
     Type *ptr_to; // typeがPTRのとき、指している型
 };
 
@@ -137,6 +140,9 @@ void expect(char *op);
 int expect_number();
 
 Type *build_type(TypeKind kind, int pointer_count);
+Type *new_type(TypeKind kind, Type *base);
+Type *ty_int(void);
+Type *pointer_to(Type *base);
 TypeKind token_to_type_kind(Token *tok);
 
 

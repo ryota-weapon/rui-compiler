@@ -45,6 +45,36 @@ Node *new_node(NodeKind kind, Node *lhs, Node *rhs) {
     node->kind = kind;
     node->lhs = lhs;
     node->rhs = rhs;
+
+    if (node->kind == ND_DEREF) {
+        if (lhs->type->kind != TY_PTR) {
+            error("デリファレンスをするのはポインタに制限している");
+        }
+        node->type = lhs->type->ptr_to;
+    } else if (node->kind == ND_ADDR) {
+        if (lhs->kind != ND_LVAR) {
+            error("変数じゃないものに対してアドレスをとることは、現状できない");
+        }
+        node->type = new_type(TY_PTR, node->lhs->type);
+    } else if (node->kind == ND_ASSIGN) {
+        if (lhs->type->kind == TY_INT && rhs->type->kind == TY_PTR) {
+            error("int型の変数にptr型の値を代入することはできません");
+        }
+    }
+
+    if (lhs && rhs) {
+        // TODO: 本来はptr + ptrは、エラーになるらしい。
+        if (lhs->type->kind == TY_PTR || rhs->type->kind == TY_PTR) {
+            Node *pointerNode = lhs->type->kind == TY_PTR ? lhs : rhs;
+            node->type = pointerNode->type;
+        } else {
+            node->type = ty_int();
+        }
+    } else if (lhs) {
+        node->type = lhs->type;
+    } else if (rhs) {
+        node->type = rhs->type;
+    }
     return node;
 }
 
@@ -52,6 +82,7 @@ Node *new_node_num(int val) {
     Node *node = calloc(1, sizeof(Node));
     node->kind = ND_NUM;
     node->val = val;
+    node->type = ty_int(); // 数値リテラルはint型
     return node;
 }
 
@@ -186,9 +217,9 @@ Node *stmt() {
             return node;
         } else if (*token->str == ';' || *token->str == ',') { // consumeしちゃうと崩れちゃうから、対応
             // 変数の宣言である: 変数をLocalsに登録する
-            int ptr_count = consume_pointer(); // ポインタの宣言をサポートするために、ポインタの数を消費しておく
-            Type *ty = build_type(token_to_type_kind(type_tok), ptr_count);
+            Type *ty = build_type(token_to_type_kind(type_tok), ptr_count); // 注意、結構遠いところのptr_countを参照している
             LVar *lvar = register_new_lvar(ident_tok, ty);
+
             node = calloc(1, sizeof(Node));
             node->offset = lvar->offset;
             node->kind = ND_LVAR_DEF;
@@ -199,7 +230,7 @@ Node *stmt() {
                     error_at(token->str, "変数名がありません");
                 Token *ident_tok = token;
                 token = token->next;
-                int ptr_count = consume_pointer();
+                // int ptr_count = consume_pointer(); ここではいらないだろう
                 Type *ty = build_type(token_to_type_kind(type_tok), ptr_count);
                 LVar *lvar = register_new_lvar(ident_tok, ty);
             }
@@ -314,23 +345,44 @@ int consume_pointer() {
     while (consume("*")) {
         count++;
     }
+    // printf("debug: inside func; pointer_count: %d\n", count);
     return count;
 }
 
 TypeKind token_to_type_kind(Token *tok) {
     if (strncmp(tok->str, "int", tok->len) == 0) {
-        return INT;
+        return TY_INT;
     }
     error_at(tok->str, "未対応の型です");
 }
 
-Type *build_type(TypeKind kind, int pointer_count) {
+Type *new_type(TypeKind kind, Type *base) {
     Type *ty = calloc(1, sizeof(Type));
-    ty->type = kind;
-    if (pointer_count > 0) {
-        ty->type = PTR;
-        ty->ptr_to = build_type(kind, pointer_count-1);
+    ty->kind = kind;
+    ty->ptr_to = base;
+    return ty;
+}
+
+Type *ty_int(void) {
+    static Type ty = { TY_INT };
+    return &ty;
+}
+
+Type *pointer_to(Type *base) {
+    return new_type(TY_PTR, base);
+}
+
+Type *build_type(TypeKind kind, int pointer_count) {
+    Type *ty;
+    if (kind == TY_INT) {
+        ty = ty_int();
+    } else {
+        error("未対応の型です");
     }
+    for (int i=0; i < pointer_count; i++) {
+        ty = pointer_to(ty);
+    }
+
     return ty;
 }
 
@@ -375,6 +427,12 @@ Node *primary() {
             node->arg_len = count;
         }
         // TODO: align RSP to 16byte due to the ABI
+
+
+        // 型情報の考慮をしてあげたい (ここが適切かは不明)
+        // TODO: 関数の戻り値の型の管理
+        node->type = lvar->type;
+
         return node;
     }
 
@@ -393,6 +451,9 @@ Node *unary() {
     }
     if (consume("&")) {
         return new_node(ND_ADDR, unary(), NULL);
+    }
+    if (consume("sizeof")) {
+        return new_node(ND_SIZEOF, unary(), NULL);
     }
     return primary();
 }

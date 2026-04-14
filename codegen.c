@@ -39,6 +39,18 @@ void gen_func(Function *func) {
 void gen(Node *node) {
     // TODO: ND_FUNC_DEFもここでさばくようにしようかな
     if (node->kind == ND_LVAR_DEF) { 
+        return; // あのノードは不完全に一応生成されているが、生成時に内部のテーブルには登録されているので、コード生成の段階では何もしなくていいはず
+    }
+
+    if (node->kind == ND_SIZEOF) {
+        // pointer -> 8, int -> 4
+        if (node->lhs->type->kind == TY_PTR) {
+            printf("  push 8\n");
+        } else if (node->lhs->type->kind == TY_INT) {
+            printf("  push 4\n");
+        } else {
+            error("sizeofの対象がintでもptrでもない");
+        }
         return;
     }
 

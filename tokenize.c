@@ -137,7 +137,7 @@ Token *tokenize(char *p) {
             p += 2;
             continue;
         }
-        if (strncmp(p, "else", 2) == 0 && !is_alnum(p[4])) {
+        if (strncmp(p, "else", 4) == 0 && !is_alnum(p[4])) {
             Token *tok = calloc(1, sizeof(Token));
             tok->kind = TK_RESERVED;
             tok->len = 4;
@@ -155,6 +155,17 @@ Token *tokenize(char *p) {
             cur->next = tok;
             cur = tok;
             p += 3;
+            continue;
+        }
+        
+        if (strncmp(p, "sizeof", 6) == 0 && !is_alnum(p[6])) {
+            Token *tok = calloc(1, sizeof(Token));
+            tok->kind = TK_RESERVED;
+            tok->len = 6;
+            tok->str = p;
+            cur->next = tok;
+            cur = tok;
+            p += 6;
             continue;
         }
 

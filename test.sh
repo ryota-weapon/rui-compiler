@@ -195,7 +195,28 @@ assert 6 'int main() { int a, b, c; a=1; { b=2; c=3; } return a+b+c;}'
 # int main() { return foo(); }
 # '
 assert 3 'int main() { int a; a=3; int *b; b=&a; return *b;}'
-
 assert 5 'int main() { int a; a=3; int *b; b=&a; *b=5; return a;}'
+
+# alloc4はintを4つ分確保する、何バイトずつ？→4バイトずつ
+# intのベースは4バイト、
+# assert 4 'int main() { int *p;
+# alloc4(&p, 1, 2, 4, 8);
+# int *q;
+# q = p + 2;
+# return *q;}  // → 4'
+
+# assert 8 'int main() { int *p;
+# alloc4(&p, 1, 2, 4, 8);
+# int *q;
+# q = p + 3;
+# return *q;}'
+
+
+assert 4 'int main() { return sizeof(3); }'
+assert 4 'int main() { return sizeof(2+3*4); }'
+assert 4 'int main() { int x; return sizeof(x); }'
+assert 8 'int main() { int *y; return sizeof(y); }'
+assert 8 'int main() { int *y; return sizeof(y+3); }'
+
 
 echo OK
