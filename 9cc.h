@@ -53,6 +53,8 @@ typedef enum {
 
     ND_LVAR_DEF,
     ND_SIZEOF,
+
+    ND_DECAY, // trialです
 } NodeKind;
 
 
@@ -84,11 +86,15 @@ struct Node {
     Type *type;
 };
 
-typedef enum { TY_INT, TY_PTR } TypeKind;
+typedef enum { TY_INT, TY_PTR, TY_ARRAY } TypeKind;
 
+// 配列はサイズ分だけスタック領域に確保する
+
+typedef unsigned long size_t;
 struct Type {
     TypeKind kind;
     Type *ptr_to; // typeがPTRのとき、指している型
+    size_t array_size; // size_tは符号なし整数型
 };
 
 typedef struct Function Function;
@@ -143,6 +149,7 @@ int expect_number();
 
 Type *build_type(TypeKind kind, int pointer_count);
 Type *new_type(TypeKind kind, Type *base);
+Type *new_type_array(Type *base, int array_size);
 Type *ty_int(void);
 Type *pointer_to(Type *base);
 TypeKind token_to_type_kind(Token *tok);

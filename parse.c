@@ -4,16 +4,18 @@
 
 #include <stdio.h> // debug
 
+#define MAX_BLOCK_STMT 20
+
 Node *build_block_node() {
     Node *node;
     node = calloc(1, sizeof(Node));
     node->kind = ND_BLOCK;
 
-    Node **node_buf = calloc(1, sizeof(Node)*10); // 一旦固定で10行までサポート
+    Node **node_buf = calloc(1, sizeof(Node)*MAX_BLOCK_STMT); // 一旦固定でMAX_BLOCK_STMT行までサポート
     int i = 0;
     while (!consume("}")) {
         node_buf[i++] = stmt();
-        if (i==10)
+        if (i==MAX_BLOCK_STMT)
             error("too bigなブロックは今サポートされていない.");
     }
     node->stmt_len = i;
@@ -21,7 +23,26 @@ Node *build_block_node() {
     return node;
 }
 
+int size_of(Type *ty) {
+    if (ty->kind == TY_INT) {
+        return 4;
+    } else if (ty->kind == TY_PTR) {
+        return 8;
+    } else if (ty->kind == TY_ARRAY) {
+        return size_of(ty->ptr_to) * ty->array_size;
+    } else {
+        error("intでもptrでもない型のsizeofはサポートしていません");
+    }
+}
+
 LVar *register_new_lvar(Token *ident_tok, Type *type) {
+    if (find_lvar(ident_tok)) {
+        error_at(ident_tok->str, "変数はすでに宣言されています");
+    }
+    if (find_fn(ident_tok)) {
+        error_at(ident_tok->str, "関数と同じ名前の変数は宣言できません");
+    }
+
     LVar *lvar = calloc(1, sizeof(LVar));
     lvar->next = locals;
     lvar->name = ident_tok->str;
@@ -31,13 +52,32 @@ LVar *register_new_lvar(Token *ident_tok, Type *type) {
 
 
     if (locals) {
-        lvar->offset = locals->offset + 8;
+        // sizeを把握する
+        // 一個前の変数のオフセット　＋　その変数のサイズ分だけずらせばよいのでは？
+        int size = size_of(locals->type);
+        int aligned = (size + 7) & ~7; // 8の倍数に切り上げる
+        // このコードは、~はビットの反転, 00000111を反転すると11111000になる、
+        // これとANDをとると、8で割った余りを捨てることができる
+        // そして、+7しているのは、切り下げではなく、切り上げにしたいから
+        lvar->offset = locals->offset + aligned;
     } else {
+        // ローカル変数のアクセスは、RBP + offset
+        // 関数の開始時、*RBPは、前のフレーム（呼び出し元の関数）のRBPを保持している（サイズは8バイト）
+        // すなわち、最初のローカル変数のオフセットは、それを避けて8
         lvar->offset = 8;
     }
     locals = lvar;
 
     return lvar;
+}
+
+Type *decay_array(Type *ty) {
+    if (ty->kind == TY_ARRAY) {
+        ty->kind = TY_PTR;
+        return ty;
+    } else {
+        error("配列以外の型のディケイはサポートしていません");
+    }
 }
 
 Node *new_node(NodeKind kind, Node *lhs, Node *rhs) {
@@ -47,18 +87,30 @@ Node *new_node(NodeKind kind, Node *lhs, Node *rhs) {
     node->rhs = rhs;
 
     if (node->kind == ND_DEREF) {
+        // if (lhs->type->kind != TY_PTR && lhs->type->kind != TY_ARRAY) {
+        if (lhs->type->kind == TY_ARRAY) {
+            // WARN: おそらくこのパスは通らなくなった
+            // arrayをDEREFの対象にするということで、ディケイを実行する、このタイミングが一定合理的だと思われる
+            lhs->type = decay_array(lhs->type);
+        }
+        // printf("debug: deref node, lhs type kind: %d\n", lhs->type->kind);
         if (lhs->type->kind != TY_PTR) {
-            error("デリファレンスをするのはポインタに制限している");
+            // arrayの場合は、配列の先頭のアドレスを指すポインタにdecay
+            // NOTE: もしかしたらポインタのままでよいかも, 別の機構にてarray->pointerのディケイをやっておく
+            // すると、*(a+1)みたいなことをやるときに、今まで通りのポインタ加算の仕組みで解決できる
+            error_at(token->str, "デリファレンスをするのはポインタか配列に制限している");
         }
         node->type = lhs->type->ptr_to;
+        return node; // バグを生んでいる可能性があるので、もう後の処理で上書きされないように終了
     } else if (node->kind == ND_ADDR) {
-        if (lhs->kind != ND_LVAR) {
-            error("変数じゃないものに対してアドレスをとることは、現状できない");
-        }
+        // if (lhs->kind != ND_LVAR) {
+        //     error_at(token->str, "変数じゃないものに対してアドレスをとることは、現状できない");
+        // }
+        // NOTE: 一旦別にいいや、てか多分別に良い
         node->type = new_type(TY_PTR, node->lhs->type);
     } else if (node->kind == ND_ASSIGN) {
         if (lhs->type->kind == TY_INT && rhs->type->kind == TY_PTR) {
-            error("int型の変数にptr型の値を代入することはできません");
+            error_at(token->str, "int型の変数にptr型の値を代入することはできません");
         }
     }
 
@@ -72,8 +124,9 @@ Node *new_node(NodeKind kind, Node *lhs, Node *rhs) {
         }
     } else if (lhs) {
         node->type = lhs->type;
-    } else if (rhs) {
-        node->type = rhs->type;
+    } else if (rhs) { // こんなケースは存在しない
+        // node->type = rhs->type;
+        error("rhsだけのノードは今のところ存在しないはず");
     }
     return node;
 }
@@ -170,6 +223,7 @@ Node *stmt() {
         Token *ident_tok = token;
         token = token->next;
 
+        // option: 通常の変数、関数定義、配列（new)
         if (consume("(")) {
             // 関数定義
             Function *fn = calloc(1, sizeof(Function));
@@ -215,6 +269,20 @@ Node *stmt() {
             node->func = fn;
             // node->func = fn;
             return node;
+        } else if (consume("[")) {
+            // 配列の宣言：　スタック領域に直接バッファを確保する
+            int size = expect_number();
+            // NOTE: これ数値リテラルとは限らないかも？ c言語の仕様を知らない。
+
+            Type *array_ty = new_type_array(ty, size); // 配列の型を作る、配列の要素の型はty
+            LVar *lvar = register_new_lvar(ident_tok, array_ty);
+            node = calloc(1, sizeof(Node));
+            node->kind = ND_LVAR_DEF;
+            node->offset = lvar->offset;
+            node->type = array_ty;
+
+            expect("]");
+            expect(";");
         } else if (*token->str == ';' || *token->str == ',') { // consumeしちゃうと崩れちゃうから、対応
             // 変数の宣言である: 変数をLocalsに登録する
             Type *ty = build_type(token_to_type_kind(type_tok), ptr_count); // 注意、結構遠いところのptr_countを参照している
@@ -223,7 +291,7 @@ Node *stmt() {
             node = calloc(1, sizeof(Node));
             node->offset = lvar->offset;
             node->kind = ND_LVAR_DEF;
-
+            node->type = ty;
             // TODO: , で区切って複数同時宣言のサポート
             while (consume(",")) {
                 if (!consume_ident())
@@ -298,15 +366,6 @@ Node *equality() {
     }
 }
 
-int size_of(Type *ty) {
-    if (ty->kind == TY_INT) {
-        return 4;
-    } else if (ty->kind == TY_PTR) {
-        return 8;
-    } else {
-        error("intでもptrでもない型のsizeofはサポートしていません");
-    }
-}
 
 Node *add() {
     Node *node = mul();
@@ -318,6 +377,17 @@ Node *add() {
 
             Node *lhs = node;
             Node *rhs = mul();
+
+            // WARN: 配列のインデクシングについて、このパスを通らないです！ addではなくnew_nodeで作っているから
+            // // TODO: add array support
+            // if (lhs->type->kind == TY_ARRAY) {
+            //     // decayしてポインタにする
+            //     lhs->type = decay_array(lhs->type); // これだと, intとかになってしまうのでは？
+            // } else if (rhs->type->kind == TY_ARRAY) {
+            //     rhs->type = decay_array(rhs->type);
+            // }
+
+
             // add or sub, pointer 8, int: 4
             if (lhs->type->kind == TY_PTR && rhs->type->kind == TY_INT) {
                 rhs = new_node(ND_MUL, rhs, new_node_num(size_of(lhs->type->ptr_to)));
@@ -326,7 +396,7 @@ Node *add() {
                 lhs = new_node(ND_MUL, lhs, new_node_num(size_of(rhs->type->ptr_to)));
                 node = new_node(kind, lhs, rhs);
             } else if (lhs->type->kind == TY_PTR && rhs->type->kind == TY_PTR && kind == ND_ADD) {
-                error("ポインタ同士の加算はサポートしていません");
+                error_at(token->str, "ポインタ同士の加算はサポートしていません");
             } else { // ptr同士の減算はサポートしている, この時、倍率を考慮する必要はないはず
                 node = new_node(kind, lhs, rhs);
             }
@@ -388,6 +458,14 @@ Type *new_type(TypeKind kind, Type *base) {
     return ty;
 }
 
+Type *new_type_array(Type *base, int array_size) {
+    Type *ty = calloc(1, sizeof(Type));
+    ty->kind = TY_ARRAY;
+    ty->ptr_to = base;
+    ty->array_size = array_size;
+    return ty;
+}
+
 Type *ty_int(void) {
     static Type ty = { TY_INT };
     return &ty;
@@ -427,6 +505,7 @@ Node *primary() {
         if (lvar) {
             node->offset = lvar->offset;
             node->type = lvar->type;
+            // printf("debug: var name: %.*s, offset: %d, type: %d\n", lvar->len, lvar->name, lvar->offset, lvar->type->kind);
         } else if (!func) {
             // TODO: 外部関数の呼び出しを雑にできるように臨時パッチ
             // error_at(token->str, "変数 or 関数が宣言されていません");
@@ -454,9 +533,26 @@ Node *primary() {
             node->func_symbol_len = tok->len;
             node->args = args;
             node->arg_len = count;
-        }
-        // TODO: align RSP to 16byte due to the ABI
+        } else if (consume("[")) {
+            // 配列の添え字アクセス: a[b] -> *(aのアドレス + b) (*(a+b)になるが, aがディケイしてポインタになる)
+            Node *index = expr();
+            // ここで、indexの型がintであることを確認しておきたい
+            if (index->type->kind != TY_INT) {
+                error_at(token->str, "配列のインデックスはint型でなければなりません");
+            }
+            expect("]");
 
+            // nodeはLVARが入っている, 配列の変数である
+            // indexは式として解釈されて、その計算結果が数値としてくると期待する
+            // Node *mul = new_node(ND_MUL, index, new_node_num(size_of(node->type->ptr_to))); // インデックスに要素のサイズをかける
+            // ↑とんでもなく遅いと思う
+            Node *addr = new_node(ND_ADD, node, new_node_num(size_of(node->type->ptr_to)*index->val)); // 配列の先頭アドレス + インデックス * 要素のサイズ
+            addr->type = pointer_to(node->type->ptr_to); // 配列の要素の型へのポインタ
+
+            node = new_node(ND_DEREF, addr, NULL);
+            node->type = node->lhs->type->ptr_to; // 配列の要素の型
+        }
+        
 
         // 型情報の考慮をしてあげたい (ここが適切かは不明)
         // TODO: 関数の戻り値の型の管理

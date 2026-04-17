@@ -99,6 +99,28 @@ int *q;
 q = p + 3;
 return *q;}'
 
+assert 2 'int main() { int *p;
+alloc4(&p, 1, 2, 4, 8);
+int *q;
+q = p + 3;
+q = q - 2;
+return *q;}'
+
+assert 0 "int main(){int a[2]; return 0;}"
+assert 2 "int main(){int a[2]; a[0] = 2; return a[0];}"
+assert 5 "int main(){int a[2]; a[0] = 3; a[1] = 5; return a[1];}"
+assert 8 "int main(){int a[2]; a[0] = 3; a[1] = 5; return a[0]+a[1];}"
+# スタックへの配列バッファ確保バグの確認＝前後の書き換えでバグがおきないかの確認
+assert 8 "int main(){int a[2]; a[0] = 3; a[1] = 5; int b; b=0; return a[0]+a[1];}"
+assert 59 "int main(){int a[2]; a[0] = 34; a[1] = 25; int b; b=0; int c; c=0; return a[0]+a[1];}"
+assert 10 "int main(){int x, y; int a[4]; a[3] = 3; a[2] = 5; int b,c,d;c=0;b=0;d=0; return a[2]+2+a[3];}"
+assert 8 "int main(){int x, y; x = 333; y = 25; int a[2]; a[1] = 3; a[0] = 5; int b; b=3323; int c; c=2332; return a[0]+a[1];}"
+
+assert 2 "int main(){int a[2];*a = 1;*(a + 1) = 2;int *p;p = a;return *p + *p;}"
+assert 2 "int main(){int a[2];*a = 1;*(a + 1) = 2;int *p;p = a;return *p + *(p);}"
+assert 3 "int main(){int a[2];*a = 1;*(a + 1) = 2;int *p;p = a;return *p + *(p + 1);}"
+
+
 
 assert 4 'int main() { return sizeof(3); }'
 assert 4 'int main() { return sizeof(2+3*4); }'

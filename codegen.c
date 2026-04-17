@@ -49,6 +49,8 @@ void gen(Node *node) {
             printf("  push 8\n");
         } else if (node->lhs->type->kind == TY_INT) {
             printf("  push 4\n");
+        } else if (node->lhs->type->kind == TY_ARRAY) {
+            printf("  push %lu\n", node->lhs->type->array_size * size_of(node->lhs->type->ptr_to));
         } else {
             error("sizeofの対象がintでもptrでもない");
         }
@@ -71,18 +73,32 @@ void gen(Node *node) {
         return;
     case ND_LVAR:
         gen_lval(node);
+        if (node->type->kind == TY_ARRAY) {
+            // 配列の変数の場合は、変数のアドレスをスタックに積むだけでよい、配列の要素へのアクセスは、DEREFノードを追加して対応することにする
+            return;
+        }
+
         printf("  pop rax\n");
-        printf("  mov rax, [rax]\n");
+        if (node->type->kind == TY_PTR) {
+            printf("  mov rax, [rax]\n");
+        } else {
+            printf("  mov eax, [rax]\n");
+        }
         printf("  push rax\n");
         return;
     case ND_ASSIGN:
         gen_lval(node->lhs);
         gen(node->rhs);
 
-//  上記2行によって、スタックには、左辺の変数などのアドレスと、右辺の評価結果が積まれている
+        //  上記2行によって、スタックには、左辺の変数などのアドレスと、右辺の評価結果が積まれている
         printf("  pop rdi\n");
         printf("  pop rax\n");
-        printf("  mov [rax], rdi\n"); //　左辺のアドレスを使ってアドレッシングして、右辺の値を格納
+        // printf("  mov [rax], rax\n"); //　左辺のアドレスを使ってアドレッシングして、右辺の値を格納
+        if (node->type->kind == TY_PTR) {
+            printf("  mov [rax], rdi\n"); // ポインタ型の変数に対しては、8バイト分格納する
+        } else {
+            printf("  mov [rax], edi\n"); // int型の変数に対しては、4バイト分格納する
+        }
         printf("  push rdi\n"); 
         // なぜpushするか？？教科書に解説あったっけな？ この式全体の値としては右辺の値になるべきなのかもです。　
         // C言語の仕様はそのようになってるんだっけ？　-> YES
@@ -175,7 +191,7 @@ void gen(Node *node) {
         printf("  call %.*s\n", node->func_symbol_len, node->func_symbol);
         printf(  
           "  jmp .Lcall_end\n"
-          "  .Lcall_misalign:\n"
+          ".Lcall_misalign:\n"
           "  sub rsp, 8\n"
           "  mov rax, 0\n");
 
@@ -214,11 +230,17 @@ void gen(Node *node) {
     printf("  pop rdi\n");
     printf("  pop rax\n");
 
+
+    char *rax_operand = node->type->kind == TY_PTR ? "rax" : "eax"; // mov raxは8バイトを操作してしまう、ポインタのときはraxで、intのときはeaxで操作することにする
+    char *rdi_operand = node->type->kind == TY_PTR ? "rdi" : "edi";
+
     switch (node->kind) {
     case ND_ADD:
         printf("  add rax, rdi\n");
+        // printf("  add %s, %s\n", rax_operand, rdi_operand);
         break;
     case ND_SUB:
+        // printf("  sub %s, %s\n", rax_operand, rdi_operand);
         printf("  sub rax, rdi\n");
         break;
     case ND_MUL:
@@ -229,22 +251,42 @@ void gen(Node *node) {
         printf("  idiv rdi\n");
         break;
     case ND_EQ:
-        printf("  cmp rax, rdi\n");
+        if (node->type->kind == TY_INT) {
+            printf("  cmp eax, edi\n");
+        } else {
+            printf("  cmp rax, rdi\n");
+        }
+        // printf("  cmp rax, rdi\n");
         printf("  sete al\n"); // seteは8ビットレジスタしか受け取れない
         printf("  movzb rax, al\n"); // 上位56ビットをゼロクリアしながら、raxを更新
         break;
     case ND_NEQ:
-        printf("  cmp rax, rdi\n");
+        if (node->type->kind == TY_INT) {
+            printf("  cmp eax, edi\n");
+        } else {
+            printf("  cmp rax, rdi\n");
+        }
+        // printf("  cmp rax, rdi\n");
         printf("  setne al\n");
         printf("  movzb rax, al\n");
         break;
     case ND_LT:
-        printf("  cmp rax, rdi\n");
+        if (node->type->kind == TY_INT) {
+            printf("  cmp eax, edi\n");
+        } else {
+            printf("  cmp rax, rdi\n");
+        }
+        // printf("  cmp rax, rdi\n");
         printf("  setl al\n");
         printf("  movzb rax, al\n");
         break;
     case ND_LTE:
-        printf("  cmp rax, rdi\n");
+        // intだったら、４バイト分として扱った方が良いかな？
+        if (node->type->kind == TY_INT) {
+            printf("  cmp eax, edi\n");
+        } else {
+            printf("  cmp rax, rdi\n");
+        }
         printf("  setle al\n");
         printf("  movzb rax, al\n");
         break;
