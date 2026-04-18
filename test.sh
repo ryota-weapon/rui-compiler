@@ -133,4 +133,18 @@ assert 8 'int main() { int *y; return sizeof(y+3); }'
 assert 0 'int x; int main() { return x; }' # この状態では、0になるはずらしい、グローバル変数はそういう仕様なのだと思う
 assert 3 'int x; int main() { x = 3; return x; }'
 
+assert 3 'int main() { char a; a = 3; return a;}'
+assert 2 'int main() { char a; a = 258; return a;}' # charは1バイトなので、258は2を返すはず
+assert 3 'int main() { char x[3]; x[0] = -1; x[1] = 3; x[2] = 5; return x[1];}'
+assert 3 'int main() { char x[3]; x[0] = -1; int y; y=4; return x[0] + y;}'
+
+assert 1 'int main() { char a,b; a=1;b=2; return a;}' # mov [eax] raxならばbの代入がaを上書き
+assert 1 'int main() { char a,b; b=1;a=2; return b;}'
+# NOTE: そういえば変数については、おそらく8バイトアラインされてるから、事故らない
+# でも、配列は連続して配置するようにしてるから、バグるのでは？
+assert 2 'int main() {char x[3];x[0] = 1;x[1] = 2;x[2] = 3;return x[1];}'
+assert 2 'int main() {char x[3];x[0] = 1;x[1] = 2;x[0] = 3;return x[1];}'
+assert 1 'int main() {char x[3];x[0] = 1;int a; a = x[0];x[1] = 2;return a;}'
+assert 1 'int main() {char x[3];x[1] = 1;int a; a = x[1];x[1] = 2;return a;}'
+assert 100 'int main() {char x[3];int y; y = 100;x[0] = 1;return y;}'
 echo OK

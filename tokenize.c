@@ -121,6 +121,16 @@ Token *tokenize(char *p) {
             p += 3;
             continue;
         }
+        if (strncmp(p, "char", 4) == 0 && !is_alnum(p[4])) {
+            Token *tok = calloc(1, sizeof(Token));
+            tok->kind = TK_TYPE;
+            tok->len = 4;
+            tok->str = p;
+            cur->next = tok;
+            cur = tok;
+            p += 4;
+            continue;
+        }
 
         if (strncmp(p, "while", 5) == 0 && !is_alnum(p[5])) {
             Token *tok = calloc(1, sizeof(Token));
@@ -180,7 +190,7 @@ Token *tokenize(char *p) {
             tok->str = p;
             cur->next = tok;
             cur = tok;
-            // tokens[i].kind = TK_RETURN;　誤植？
+            // tokens[i].kind = TK_RETURN; 誤植？
             // tokens[i].str = p; 誤植？
             // i++;
             p += 6;

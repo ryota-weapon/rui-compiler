@@ -1,12 +1,62 @@
 #include <stdio.h>
 #include "9cc.h"
 
+char *reg_ax(int size) {
+    if (size == 1) {
+        return "al";
+    } else if (size == 4) {
+        return "eax";
+    } else if (size == 8) {
+        return "rax";
+    } else {
+        error("対応していないサイズのレジスタを要求しています(reg_ax)");
+    }
+}
+
+char *reg_di(int size) {
+    if (size == 1) {
+        return "dil";
+    } else if (size == 4) {
+        return "edi";
+    } else if (size == 8) {
+        return "rdi";
+    } else {
+        error("対応していないサイズのレジスタを要求しています(reg_di)");
+    }
+}
+
+void print_load(Type *ty) {
+    if (ty->kind == TY_PTR) {
+        printf("  mov rax, [rax]\n");
+    } else if (ty->kind == TY_INT) {
+        printf("  mov eax, [rax]\n");
+    } else if (ty->kind == TY_CHR) {
+        printf("  movzx eax, byte ptr [rax]\n"); // 符号拡張なし
+        // printf("  movsx eax, byte ptr [rax]\n"); // 符号拡張あり
+    } else {
+        error("対応していない型のロードを要求しています");
+    }
+}
+
+void print_store(Type *ty) {
+    if (ty->kind == TY_PTR) {
+        printf("  mov [rax], rdi\n");
+    } else if (ty->kind == TY_INT) {
+        printf("  mov [rax], edi\n");
+    } else if (ty->kind == TY_CHR) {
+        // printf("  mov [rax], dil\n");
+        printf("  mov byte ptr [rax], dil\n");
+    } else {
+        error("対応していない型のストアを要求しています");
+    }
+}
+
 // （後からの解釈にはなるが、）スタックトップに変数のアドレスを積むことをやっている
 void gen_lval(Node *node) {
     // derefのサポートをした方が良い気がする
     if (node->kind == ND_DEREF) {
         gen(node->lhs); // スタックトップに変数の値をアドレスとして積む
-        // WARN: ここバグってそう
+        // WARN: ここバグってそう?
         return;
     }
 
@@ -61,8 +111,10 @@ void gen(Node *node) {
             printf("  push 4\n");
         } else if (node->lhs->type->kind == TY_ARRAY) {
             printf("  push %lu\n", node->lhs->type->array_size * size_of(node->lhs->type->ptr_to));
+        } else if (node->lhs->type->kind == TY_CHR) {
+            printf("  push 1\n");
         } else {
-            error("sizeofの対象がintでもptrでもない");
+            error("sizeofの対象がおかしい型です");
         }
         return;
     }
@@ -89,11 +141,16 @@ void gen(Node *node) {
         }
 
         printf("  pop rax\n");
-        if (node->type->kind == TY_PTR) {
-            printf("  mov rax, [rax]\n");
-        } else {
-            printf("  mov eax, [rax]\n");
-        }
+        // NOTE: 条件付きロードにすべきかもしれないんだよなぁ... 
+        // (left valueの時はアドレス、right valueのときは値)
+        // でも、left valueのときは、ND_ASSIGNから呼ばれるはずだから、大丈夫だと思ってる
+        print_load(node->type);
+        // printf("  mov %s, [rax]\n", reg_ax(size_of(node->type)));
+        // if (node->type->kind == TY_PTR) {
+        //     printf("  mov rax, [rax]\n");
+        // } else {
+        //     printf("  mov eax, [rax]\n");
+        // }
         printf("  push rax\n");
         return;
     case ND_ASSIGN:
@@ -103,15 +160,19 @@ void gen(Node *node) {
         //  上記2行によって、スタックには、左辺の変数などのアドレスと、右辺の評価結果が積まれている
         printf("  pop rdi\n");
         printf("  pop rax\n");
-        // printf("  mov [rax], rax\n"); //　左辺のアドレスを使ってアドレッシングして、右辺の値を格納
-        if (node->type->kind == TY_PTR) {
-            printf("  mov [rax], rdi\n"); // ポインタ型の変数に対しては、8バイト分格納する
-        } else {
-            printf("  mov [rax], edi\n"); // int型の変数に対しては、4バイト分格納する
-        }
+        // printf("  mov [rax], rdi\n"); // 左辺のアドレスを使ってアドレッシングして、右辺の値を格納
+        // if (node->type->kind == TY_PTR) {
+        //     printf("  mov [rax], rdi\n"); // ポインタ型の変数に対しては、8バイト分格納する
+        // } else {
+        //     printf("  mov [rax], edi\n"); // int型の変数に対しては、4バイト分格納する
+        // }
+        // printf("  mov [%s], %s\n", reg_ax(size_of(node->type)), reg_di(size_of(node->type)));
+        // printf("  mov [rax], %s\n", reg_di(size_of(node->type)));
+        print_store(node->type);
+
         printf("  push rdi\n"); 
-        // なぜpushするか？？教科書に解説あったっけな？ この式全体の値としては右辺の値になるべきなのかもです。　
-        // C言語の仕様はそのようになってるんだっけ？　-> YES
+        // なぜpushするか？？教科書に解説あったっけな？ この式全体の値としては右辺の値になるべきなのかもです。 
+        // C言語の仕様はそのようになってるんだっけ？ -> YES
         return;
     case ND_IF:
         gen(node->cond);

@@ -90,7 +90,7 @@ struct Node {
     Type *type;
 };
 
-typedef enum { TY_INT, TY_PTR, TY_ARRAY } TypeKind;
+typedef enum { TY_INT, TY_PTR, TY_ARRAY, TY_CHR } TypeKind;
 
 // 配列はサイズ分だけスタック領域に確保する
 
@@ -170,6 +170,7 @@ Type *ty_int(void);
 Type *pointer_to(Type *base);
 TypeKind token_to_type_kind(Token *tok);
 
+int size_of(Type *ty);
 
 // gen
 void gen(Node *node);

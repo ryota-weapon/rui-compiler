@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
     printf(".data\n");
     for (GVar *gvar=globals; gvar; gvar = gvar->next) {
         if (gvar->type->kind == TY_ARRAY) {
-            printf("%.*s:\n", gvar->len, gvar->len, gvar->name);
+            printf("%.*s:\n", gvar->len, gvar->name);
             printf("  .zero %d\n", size_of(gvar->type)); // 0で初期化された領域を確保する
         } else if (gvar->type->kind == TY_INT || gvar->type->kind == TY_PTR) {
             printf("%.*s:\n", gvar->len, gvar->name);
@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
     for (int i=0; i<100; i++) {
     // for (int i=0; code[i]; i++) {
         gen(code[i]);
-        // printf("  pop rax\n"); //　exprの評価結果として1つ値が残っているので、消しておく。
+        // printf("  pop rax\n"); // exprの評価結果として1つ値が残っているので、消しておく。
         // WARN: exprじゃないノードの時にバグる説
         // 何もスタックに積まない処理もある、ちゃんと図とかを書いて理解した方がよさそう
         // add, sub, mul, div, eq, neq, lt, lte

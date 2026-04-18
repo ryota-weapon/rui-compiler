@@ -24,14 +24,17 @@ Node *build_block_node() {
 }
 
 int size_of(Type *ty) {
+    // printf("debug: size_of, type kind: %d\n", ty->kind);
     if (ty->kind == TY_INT) {
         return 4;
     } else if (ty->kind == TY_PTR) {
         return 8;
     } else if (ty->kind == TY_ARRAY) {
         return size_of(ty->ptr_to) * ty->array_size;
+    } else if (ty->kind == TY_CHR) {
+        return 1;
     } else {
-        error("intでもptrでもない型のsizeofはサポートしていません");
+        error("intでもptrでもcharではない型のsizeofはサポートしていません");
     }
 }
 
@@ -53,7 +56,7 @@ LVar *register_new_lvar(Token *ident_tok, Type *type) {
 
     if (locals) {
         // sizeを把握する
-        // 一個前の変数のオフセット　＋　その変数のサイズ分だけずらせばよいのでは？
+        // 一個前の変数のオフセット ＋ その変数のサイズ分だけずらせばよいのでは？
         int size = size_of(locals->type);
         int aligned = (size + 7) & ~7; // 8の倍数に切り上げる
         // このコードは、~はビットの反転, 00000111を反転すると11111000になる、
@@ -112,6 +115,10 @@ Node *new_node(NodeKind kind, Node *lhs, Node *rhs) {
         if (lhs->type->kind == TY_INT && rhs->type->kind == TY_PTR) {
             error_at(token->str, "int型の変数にptr型の値を代入することはできません");
         }
+        // ここが超大事かもしれない
+        node->type = lhs->type; // 代入式全体の型は、左辺の型とする、これがないと, char変数にintを代入したときに、代入式全体の型がintになってしまう
+        // 下で上書きされないようにリターンを早めにした方が良いかな？ ごちゃごちゃになりすぎてる
+        return node;
     }
 
     if (lhs && rhs) {
@@ -120,7 +127,9 @@ Node *new_node(NodeKind kind, Node *lhs, Node *rhs) {
             Node *pointerNode = lhs->type->kind == TY_PTR ? lhs : rhs;
             node->type = pointerNode->type;
         } else {
-            node->type = ty_int();
+            node->type = ty_int(); // WARN: 現状だとこれはダメなはずです...
+            // int + chrみたいな時ってどうするんだっけ？ -> 昇格するらしい
+            // 今はintにするでいいかぁ。
         }
     } else if (lhs) {
         node->type = lhs->type;
@@ -315,7 +324,7 @@ Node *stmt() {
             // node->func = fn;
             return node;
         } else if (consume("[")) {
-            // 配列の宣言：　スタック領域に直接バッファを確保する
+            // 配列の宣言： スタック領域に直接バッファを確保する
             int size = expect_number();
             // NOTE: これ数値リテラルとは限らないかも？ c言語の仕様を知らない。
 
@@ -377,7 +386,7 @@ Node *stmt() {
 Node *assign() {
     Node *node = equality();
     if (consume("=")) {
-        // node->kind = ND_LVAR; // 誤植？　これ必要では？
+        // node->kind = ND_LVAR; // 誤植？ これ必要では？
         // 現状だけかも a=b=cみたいなことができちゃうよ
         node = new_node(ND_ASSIGN, node, assign()); // というか、ここassignが適切なのか？？
     }
@@ -504,6 +513,9 @@ TypeKind token_to_type_kind(Token *tok) {
     if (strncmp(tok->str, "int", tok->len) == 0) {
         return TY_INT;
     }
+    if (strncmp(tok->str, "char", tok->len) == 0) {
+        return TY_CHR;
+    }
     error_at(tok->str, "未対応の型です");
 }
 
@@ -527,6 +539,11 @@ Type *ty_int(void) {
     return &ty;
 }
 
+Type *ty_chr(void) {
+    static Type ty = { TY_CHR };
+    return &ty;
+}
+
 Type *pointer_to(Type *base) {
     return new_type(TY_PTR, base);
 }
@@ -535,6 +552,8 @@ Type *build_type(TypeKind kind, int pointer_count) {
     Type *ty;
     if (kind == TY_INT) {
         ty = ty_int();
+    } else if (kind == TY_CHR) {
+        ty = ty_chr();
     } else {
         error("未対応の型です");
     }
@@ -592,7 +611,7 @@ Node *primary() {
                 expect(")");
             }
             
-            //　非効率なコードだけどうわがきする
+            // 非効率なコードだけどうわがきする
             node = (Node *)calloc(1, sizeof(Node));
             node->kind = ND_FUNC_CALL;
             // node->func = func; // WARN: oh my gosh, 外部関数の時に摘む
@@ -613,7 +632,7 @@ Node *primary() {
             // indexは式として解釈されて、その計算結果が数値としてくると期待する
             // Node *mul = new_node(ND_MUL, index, new_node_num(size_of(node->type->ptr_to))); // インデックスに要素のサイズをかける
             // ↑とんでもなく遅いと思う
-            // node->kind = ND_ADDR; // うーん、これいるかな？　とりあえず配列をND_LVARとして扱うと、値をロードしちゃうので、バグります.
+            // node->kind = ND_ADDR; // うーん、これいるかな？ とりあえず配列をND_LVARとして扱うと、値をロードしちゃうので、バグります.
             // WARN: addr(a) + index*sizeをしたいのに、deref(addr(a)) + offsetとなる。
             Node *addr = new_node(ND_ADD, node, new_node_num(size_of(node->type->ptr_to)*index->val)); // 配列の先頭アドレス + インデックス * 要素のサイズ
             addr->type = pointer_to(node->type->ptr_to); // 配列の要素の型へのポインタ
