@@ -39,6 +39,7 @@ typedef enum {
     ND_NEQ,
     ND_ASSIGN,
     ND_LVAR,
+    ND_GVAR,
     ND_RETURN,
 
     ND_ADDR,
@@ -83,6 +84,9 @@ struct Node {
     char *func_symbol;
     int func_symbol_len;
 
+    char *gvar_name;
+    int gvar_name_len;
+
     Type *type;
 };
 
@@ -116,8 +120,20 @@ struct LVar {
 };
 
 
+typedef struct GVar GVar;
+struct GVar {
+    GVar *next; // 連結リスト
+    char *name;
+    int len;
+    Type *type;
+};
+
+
 extern LVar *locals;
 LVar *find_lvar(Token *tok);
+
+extern GVar *globals;
+GVar *find_gvar(Token *tok);
 
 extern Function *funcs; // 連結リスト
 Function *find_fn(Token *tok);

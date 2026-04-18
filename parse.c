@@ -148,6 +148,14 @@ LVar *find_lvar(Token *tok) {
     return NULL;
 }
 
+GVar *find_gvar(Token *tok) {
+    for (GVar *var=globals; var; var = var->next) {
+        if (tok->len == var->len && !memcmp(tok->str, var->name, var->len))
+            return var;
+    }
+    return NULL;
+}
+
 Function *find_fn(Token *tok) {
     for (Function *var=funcs; var; var = var->next) {
         if (tok->len == var->len && !memcmp(tok->str, var->name, var->len))
@@ -165,7 +173,37 @@ Node *program() {
     code[i] = NULL;
 }
 
+void declare_local_variable(Token *type_tok, Token *ident_tok, int ptr_count) {
+    Type *ty = build_type(token_to_type_kind(type_tok), ptr_count); // 注意、結構遠いところのptr_countを参照している
+    LVar *lvar = register_new_lvar(ident_tok, ty);
+}
+
+GVar *register_new_gvar(Token *ident_tok, Type *type) {
+    if (find_gvar(ident_tok)) {
+        error_at(ident_tok->str, "変数はすでに宣言されています");
+    }
+    if (find_fn(ident_tok)) {
+        error_at(ident_tok->str, "関数と同じ名前の変数は宣言できません");
+    }
+
+    GVar *gvar = calloc(1, sizeof(GVar));
+    gvar->next = globals;
+    gvar->name = ident_tok->str;
+    gvar->len = ident_tok->len;
+    gvar->type = type;
+
+    globals = gvar;
+
+    return gvar;
+}
+
+void declare_global_variable(Token *type_tok, Token *ident_tok, int ptr_count) {
+    Type *ty = build_type(token_to_type_kind(type_tok), ptr_count); // 注意、結構遠いところのptr_countを参照している
+    GVar *gvar = register_new_gvar(ident_tok, ty);
+}
+
 // Step17でのサポート、 1. int x;という宣言, 2. int func(int a){...}という関数定義
+int inside_func_def_count = 0;
 Node *stmt() {
     Node *node;
 
@@ -234,6 +272,11 @@ Node *stmt() {
             }
             funcs = fn;
 
+            if (inside_func_def_count > 0) {
+                error_at(token->str, "関数の中で関数を定義することはできません");
+                // C言語の仕様上、関数の中で関数を定義することはできないはずなので、エラーにする
+            }
+
             // args
             while (consume_type()) {
                 Token *arg_type_tok = token;
@@ -256,6 +299,7 @@ Node *stmt() {
 
             expect(")");
 
+            inside_func_def_count++;
             Node *body;
             // TO-FIX: これってさ、stmt()だけで実行できるのでは？
             if (consume("{")) {
@@ -263,6 +307,7 @@ Node *stmt() {
             } else {
                 body = stmt();
             }
+            inside_func_def_count--;
             fn->body = body;
             node = calloc(1, sizeof(Node));
             node->kind = ND_FUNC_DEF;
@@ -284,23 +329,34 @@ Node *stmt() {
             expect("]");
             expect(";");
         } else if (*token->str == ';' || *token->str == ',') { // consumeしちゃうと崩れちゃうから、対応
-            // 変数の宣言である: 変数をLocalsに登録する
-            Type *ty = build_type(token_to_type_kind(type_tok), ptr_count); // 注意、結構遠いところのptr_countを参照している
-            LVar *lvar = register_new_lvar(ident_tok, ty);
+            if (inside_func_def_count == 0) {
+                // グローバル変数の宣言
+                declare_global_variable(type_tok, ident_tok, ptr_count);
+                node = NULL; // グローバル変数の宣言は、コード生成の段階で特にノードを作る必要はないと思う
+            } else {
+                // ローカル変数の宣言
+                declare_local_variable(type_tok, ident_tok, ptr_count);
+                node = NULL; // ローカル変数の宣言も、コード生成の段階で特にノードを作る必要はないと思う
+            }
 
-            node = calloc(1, sizeof(Node));
-            node->offset = lvar->offset;
-            node->kind = ND_LVAR_DEF;
-            node->type = ty;
+            // node = calloc(1, sizeof(Node));
+            // node->offset = lvar->offset;
+            // node->kind = ND_LVAR_DEF;
+            // node->type = ty;
             // TODO: , で区切って複数同時宣言のサポート
             while (consume(",")) {
                 if (!consume_ident())
                     error_at(token->str, "変数名がありません");
                 Token *ident_tok = token;
                 token = token->next;
-                // int ptr_count = consume_pointer(); ここではいらないだろう
-                Type *ty = build_type(token_to_type_kind(type_tok), ptr_count);
-                LVar *lvar = register_new_lvar(ident_tok, ty);
+                
+                if (inside_func_def_count == 0) {
+                    // グローバル変数の宣言
+                    declare_global_variable(type_tok, ident_tok, ptr_count);
+                } else {
+                    // ローカル変数の宣言
+                    declare_local_variable(type_tok, ident_tok, ptr_count);
+                }
             }
 
             expect(";");
@@ -501,11 +557,22 @@ Node *primary() {
         node->kind = ND_LVAR;
 
         LVar *lvar = find_lvar(tok);
+        GVar *gvar = NULL;
+        if (!lvar) {
+            gvar = find_gvar(tok);
+        }
+
         Function *func = find_fn(tok);
         if (lvar) {
             node->offset = lvar->offset;
             node->type = lvar->type;
             // printf("debug: var name: %.*s, offset: %d, type: %d\n", lvar->len, lvar->name, lvar->offset, lvar->type->kind);
+        } else if (gvar) {
+            node->kind = ND_GVAR;
+            // node->gvar = gvar;
+            node->type = gvar->type;
+            node->gvar_name = gvar->name;
+            node->gvar_name_len = gvar->len;
         } else if (!func) {
             // TODO: 外部関数の呼び出しを雑にできるように臨時パッチ
             // error_at(token->str, "変数 or 関数が宣言されていません");
@@ -546,6 +613,8 @@ Node *primary() {
             // indexは式として解釈されて、その計算結果が数値としてくると期待する
             // Node *mul = new_node(ND_MUL, index, new_node_num(size_of(node->type->ptr_to))); // インデックスに要素のサイズをかける
             // ↑とんでもなく遅いと思う
+            // node->kind = ND_ADDR; // うーん、これいるかな？　とりあえず配列をND_LVARとして扱うと、値をロードしちゃうので、バグります.
+            // WARN: addr(a) + index*sizeをしたいのに、deref(addr(a)) + offsetとなる。
             Node *addr = new_node(ND_ADD, node, new_node_num(size_of(node->type->ptr_to)*index->val)); // 配列の先頭アドレス + インデックス * 要素のサイズ
             addr->type = pointer_to(node->type->ptr_to); // 配列の要素の型へのポインタ
 

@@ -129,4 +129,8 @@ assert 8 'int main() { int *y; return sizeof(y); }'
 assert 8 'int main() { int *y; return sizeof(y+3); }'
 
 
+
+assert 0 'int x; int main() { return x; }' # この状態では、0になるはずらしい、グローバル変数はそういう仕様なのだと思う
+assert 3 'int x; int main() { x = 3; return x; }'
+
 echo OK

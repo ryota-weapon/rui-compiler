@@ -6,15 +6,21 @@ void gen_lval(Node *node) {
     // derefのサポートをした方が良い気がする
     if (node->kind == ND_DEREF) {
         gen(node->lhs); // スタックトップに変数の値をアドレスとして積む
+        // WARN: ここバグってそう
         return;
     }
 
-    if (node->kind != ND_LVAR)
+    if (node->kind == ND_LVAR) {
+        printf("  mov rax, rbp\n");
+        printf("  sub rax, %d\n", node->offset);
+        printf("  push rax\n");
+    } else if (node->kind == ND_GVAR) {
+        // グローバル変数のアドレスをスタックに積む
+        printf("  lea rax, [rip + %.*s]\n", node->gvar_name_len, node->gvar_name);
+        printf("  push rax\n");
+    } else {
         error("左辺値が変数ではないのでだめ");
-
-    printf("  mov rax, rbp\n");
-    printf("  sub rax, %d\n", node->offset);
-    printf("  push rax\n");
+    }
 }
 
 void gen_func(Function *func) {
@@ -38,6 +44,10 @@ void gen_func(Function *func) {
 char *arg_regs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 
 void gen(Node *node) {
+   // WARN: バグに気づけなくなるリスクがあるんだけど, 
+   // 一旦Nullの時はただただスキップする
+    if (!node) return;
+
     // TODO: ND_FUNC_DEFもここでさばくようにしようかな
     if (node->kind == ND_LVAR_DEF) { 
         return; // あのノードは不完全に一応生成されているが、生成時に内部のテーブルには登録されているので、コード生成の段階では何もしなくていいはず
@@ -220,6 +230,14 @@ void gen(Node *node) {
         printf("  push rax\n");
         // スタックトップに変数のアドレスがさす値を積む
         return;
+    case ND_GVAR:
+        // グローバル変数の値をスタックに積む
+        // printf("  lea rax, [%.*s]\n", node->gvar_name_len, node->gvar_name); // これは動かない
+        // PIE対応する必要がある
+        printf("  lea rax, [rip + %.*s]\n", node->gvar_name_len, node->gvar_name);
+        printf("  mov rax, [rax]\n");
+        printf("  push rax\n");
+        return;
     }
     
 
@@ -292,6 +310,8 @@ void gen(Node *node) {
         break;
     // case ND_GT:
     // case ND_GTE: これらはパーサー側で処理するよ
+    default:
+        error("コード生成できないノードの種類です");
     }
     printf("  push rax\n");
 }
