@@ -204,6 +204,27 @@ Token *tokenize(char *p) {
             continue;
         }
         
+        if (strncmp(p, "\"", 1)==0) {
+            // cur = new_token(TK_RESERVED, cur, p++);
+            // cur->len = 1;
+            p++; // いらなくね、前後のトークン
+            
+            // 文字列トークン
+            char *start = p;
+            while (*p && *p != '\"') {
+                if (*p == '\\' && *(p + 1)) p += 2; // エスケープシーケンスをスキップ
+                else p++;
+            }
+
+            cur = new_token(TK_STR, cur, start);
+            cur->len = p - start;
+
+            p++;
+            // cur = new_token(TK_RESERVED, cur, p++);
+            // cur->len = 1;
+            continue;
+        }
+
         if (*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '(' || *p == ')' ||
             *p == '<' || *p == '>' || *p == '&' || *p == '[' || *p == ']'
         ) {

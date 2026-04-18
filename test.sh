@@ -17,6 +17,12 @@ assert() {
     fi
 }
 
+assert 111 'int main() { char *x; x = "hoge";  return x[1];}'
+assert 103 'int main() { char *x; x = "hoge";  return x[2];}'
+assert 101 'int main() { char *x; x = "hoge";  return x[3];}'
+assert 0 'char *x; x = "hoge"; int main() { return 0;}'
+# assert 0 'char *x = "hoge"; int main() { return 0;}'
+
 assert 3 'int main() { return 3;}'
 assert 5 'int main() { int a; int b; a=1;b=4;return a+b;}'
 assert 15 'int main() { int a; int b; a=3;b=4;return a*b+3;}'

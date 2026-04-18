@@ -7,6 +7,7 @@ char *user_input; // ユーザの入力したプログラム
 LVar *locals;
 GVar *globals;
 Function *funcs;
+StringLiteral *string_literals;
 
 int main(int argc, char **argv) {
     if (argc != 2) {
@@ -33,6 +34,12 @@ int main(int argc, char **argv) {
         } else {
             error("未対応の型のグローバル変数はサポートしていません");
         }
+    }
+
+    // ストリングリテラル
+    printf(".LC0:\n");
+    for (StringLiteral *sl=string_literals; sl; sl = sl->next) {
+        printf("  .string \"%.*s\"\n", sl->len, sl->content);
     }
 
 

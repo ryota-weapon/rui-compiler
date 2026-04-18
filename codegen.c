@@ -299,6 +299,12 @@ void gen(Node *node) {
         printf("  mov rax, [rax]\n");
         printf("  push rax\n");
         return;
+    case ND_STR:
+        // 文字列リテラルのアドレスをスタックに積む
+        // printf("  lea rax, [rip + .LC%d]\n", node->str_len); // 文字列リテラルの内容を識別するために、ノードのstr_lenを使うことにする
+        printf("  lea rax, [rip + .LC0]\n"); // 文字列リテラルの内容を識別するために、ノードのstr_lenを使うことにする
+        printf("  push rax\n");
+        return;
     }
     
 

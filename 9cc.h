@@ -11,6 +11,7 @@ typedef enum {
     TK_EOF,
     TK_RETURN,
     // TK_SEP,
+    TK_STR, // 文字列リテラル
 } TokenKind;
 
 // 自己参照に使う構文らしい, (TokenがTokenを参照しているでしょ、このstruct)
@@ -56,6 +57,7 @@ typedef enum {
     ND_SIZEOF,
 
     ND_DECAY, // trialです
+    ND_STR, // 文字列リテラル
 } NodeKind;
 
 
@@ -86,6 +88,10 @@ struct Node {
 
     char *gvar_name;
     int gvar_name_len;
+
+    char *str; // 文字列リテラルの内容
+    int str_len;
+    
 
     Type *type;
 };
@@ -137,6 +143,15 @@ GVar *find_gvar(Token *tok);
 
 extern Function *funcs; // 連結リスト
 Function *find_fn(Token *tok);
+
+typedef struct StringLiteral StringLiteral;
+struct StringLiteral {
+    char *content;
+    int len;
+    StringLiteral *next;
+};
+
+extern StringLiteral *string_literals; // 文字列リテラルの内容を保存するための配列
 
 // parser
 int is_alnum(char c);

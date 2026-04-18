@@ -570,6 +570,24 @@ Node *primary() {
         expect(")");
         return expr_node;
     }
+
+    if (token->kind == TK_STR) {
+        Node *node = calloc(1, sizeof(Node));
+        node->kind = ND_STR;
+        node->str = token->str;
+        node->str_len = token->len;
+
+
+        StringLiteral *sl = calloc(1, sizeof(StringLiteral));
+        sl->content = token->str;
+        sl->len = token->len;
+        sl->next = string_literals;
+        string_literals = sl;
+
+        token = token->next;
+        return node;
+    }
+
     Token *tok = consume_ident();
     if (tok) {
         Node *node = calloc(1, sizeof(Node));
@@ -640,7 +658,6 @@ Node *primary() {
             node = new_node(ND_DEREF, addr, NULL);
             node->type = node->lhs->type->ptr_to; // 配列の要素の型
         }
-        
 
         // 型情報の考慮をしてあげたい (ここが適切かは不明)
         // TODO: 関数の戻り値の型の管理
